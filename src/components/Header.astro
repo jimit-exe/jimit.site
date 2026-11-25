@@ -15,8 +15,9 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
 
 <header class="site-header">
   <div class="container bar">
-    <a class="logo" href="/" aria-label={`${site.name}, home`}>
-      <span class="tilde" aria-hidden="true">~/</span>jimitpatel<span class="cursor" aria-hidden="true"></span>
+    {/* The accessible name starts with the visible text (WCAG 2.5.3 Label in Name). */}
+    <a class="logo" href="/">
+      <span class="tilde" aria-hidden="true">~/</span>jimitpatel<span class="visually-hidden">, home</span><span class="cursor" aria-hidden="true"></span>
     </a>
 
     <div class="tools">

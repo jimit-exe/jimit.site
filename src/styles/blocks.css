@@ -188,7 +188,7 @@
 .prose [data-footnote-ref] { font-family: var(--font-mono); font-size: 0.8em; text-decoration: none; padding-inline: 0.1em; }
 .prose [data-footnote-ref]::before { content: '['; }
 .prose [data-footnote-ref]::after { content: ']'; }
-.prose .data-footnote-backref, .prose [data-footnote-backref] { text-decoration: none; }
+.prose .data-footnote-backref, .prose [data-footnote-backref] { text-decoration: underline; text-underline-offset: 0.2em; }
 
 /* ------------------------------------------------------------- code frames */
 .prose .expressive-code { margin-top: 1.5em; }
