@@ -6,8 +6,8 @@ import PixelCat from './PixelCat.astro';
 
 <div class="byte" id="byte">
   <p class="bubble mono" id="byte-says" role="status" hidden></p>
+  <span class="zzz mono" aria-hidden="true"><span>z</span><span>z</span><span>Z</span></span>
   <button class="byte-btn" type="button" aria-label="Pet Byte the cat" aria-describedby="byte-says">
-    <span class="zzz mono" aria-hidden="true"><span>z</span><span>z</span><span>Z</span></span>
     <PixelCat />
   </button>
 </div>
@@ -74,6 +74,7 @@ import PixelCat from './PixelCat.astro';
   .byte-btn:hover :global(.l-eyesOpen) { display: inline; }
   .zzz {
     position: absolute;
+    z-index: 1;
     left: 2.6rem;
     top: -1.2rem;
     display: flex;
@@ -90,7 +91,7 @@ import PixelCat from './PixelCat.astro';
     30% { opacity: 1; }
     100% { opacity: 0; transform: translateY(-10px); }
   }
-  :global(.is-awake) .zzz, .byte-btn:hover .zzz { display: none; }
+  :global(.is-awake) .zzz, .byte:has(.byte-btn:hover) .zzz { display: none; }
   @media (prefers-reduced-motion: reduce) {
     .zzz span { opacity: 1; animation: none; }
   }
