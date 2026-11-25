@@ -58,6 +58,9 @@ for (const p of draftPaths) {
 
 // 3. CSP hygiene: every page carries the policy, and no markup needs 'unsafe-inline'.
 const SPLIT = /(<script\b[\s\S]*?<\/script>|<style\b[\s\S]*?<\/style>)/gi;
+const VALUE = String.raw`(?:"[^"]*"|'[^']*'|[^\s"'=<>\x60]+)`;
+const ATTR = new RegExp(String.raw`([^\s"'<>\/=]+)(?:\s*=\s*(${VALUE}))?`, 'g');
+const TAG = new RegExp(String.raw`<([a-zA-Z][\w:-]*)((?:\s+[^\s"'<>\/=]+(?:\s*=\s*${VALUE})?)*)\s*\/?>`, 'g');
 let pages = 0;
 for (const f of files.filter((f) => f.endsWith('.html'))) {
   pages++;
@@ -76,10 +79,17 @@ for (const f of files.filter((f) => f.endsWith('.html'))) {
   if (cspAt > -1 && firstRes > -1 && cspAt > firstRes) errors.push(`${rel(f)} CSP <meta> comes after a script, style or link, so it doesn't cover them`);
   if (/'unsafe-inline'|'unsafe-eval'|'unsafe-hashes'/.test(html)) errors.push(`${rel(f)} CSP contains 'unsafe-inline' or 'unsafe-eval'`);
   const markup = html.split(SPLIT).filter((_, i) => i % 2 === 0).join('');
-  for (const tag of markup.match(/<[a-zA-Z][^<>]*>/g) ?? []) {
-    if (/\sstyle="/i.test(tag)) errors.push(`${rel(f)} has an inline style attribute: ${tag.slice(0, 80)}`);
-    if (/\son[a-z]+\s*=/i.test(tag)) errors.push(`${rel(f)} has an inline event handler: ${tag.slice(0, 80)}`);
-    if (/\s(?:href|src)\s*=\s*["']?\s*javascript:/i.test(tag)) errors.push(`${rel(f)} has a javascript: URL: ${tag.slice(0, 80)}`);
+  // Tokenise real tags, consuming quoted attribute values whole: a "<" inside a value (such as
+  // a code block's copy text in data-code="...") is text, not markup, and must not be matched.
+  for (const m of markup.matchAll(TAG)) {
+    for (const a of m[2].matchAll(ATTR)) {
+      const name = a[1].toLowerCase();
+      const value = (a[2] ?? '').replace(/^["']|["']$/g, '').trim();
+      const where = `${rel(f)} <${m[1]} ${name}=…>`;
+      if (name === 'style') errors.push(`${where} is an inline style attribute`);
+      if (/^on[a-z]+$/.test(name)) errors.push(`${where} is an inline event handler`);
+      if ((name === 'href' || name === 'src') && /^javascript:/i.test(value)) errors.push(`${where} is a javascript: URL`);
+    }
   }
 }
 

@@ -62,9 +62,14 @@ export async function imageWarnings(file) {
   return out;
 }
 
-/** Blank out fenced code blocks, keeping line numbers, so image syntax in code is ignored. */
+/**
+ * Blank out fenced code blocks and inline `code`, keeping line numbers, so image and link
+ * syntax shown as code (which renders as text) is ignored.
+ */
 const withoutCode = (s) =>
-  s.replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, (block) => block.replace(/[^\n]/g, ''));
+  s
+    .replace(/^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, (block) => block.replace(/[^\n]/g, ''))
+    .replace(/(`+)[^`\n][\s\S]*?\1/g, (code) => code.replace(/[^\n]/g, ' '));
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
@@ -73,6 +78,30 @@ function resolveImage(src, postDir) {
   const clean = decodeURI(src.split(/[?#]/)[0]);
   if (clean.startsWith('/')) return path.join(ROOT, 'public', clean);
   return path.resolve(postDir, clean);
+}
+
+// Every post's URL and whether it's published, for checking internal links.
+const SECTION = { writeup: 'writeups', methodology: 'blog', blog: 'blog', project: 'projects' };
+const postIndex = new Map(); // "/writeups/htb-reactor" -> { draft, slug }
+for (const d of readdirSync(POSTS_DIR, { withFileTypes: true })) {
+  const f = path.join(POSTS_DIR, d.name, 'index.md');
+  if (!d.isDirectory() || !existsSync(f)) continue;
+  const { data } = readPost(f);
+  postIndex.set(`/${SECTION[data.type] ?? 'blog'}/${d.name}`, { draft: data.draft !== false, slug: d.name });
+}
+const bySlug = new Map([...postIndex].map(([url, v]) => [v.slug, url]));
+const STATIC_ROUTES = new Set(['/', '/about', '/writeups', '/blog', '/projects', '/tags', '/search', '/rss.xml', '/sitemap-index.xml']);
+
+/** Problems with an internal link target, or null if it resolves to a published page or file. */
+function internalLinkProblem(href) {
+  const p = decodeURI(href.split(/[?#]/)[0]).replace(/\/$/, '') || '/';
+  if (STATIC_ROUTES.has(p) || /^\/tags\/[a-z0-9-]+$/.test(p)) return null;
+  if (existsSync(path.join(ROOT, 'public', p)) && !p.endsWith('/')) return null;
+  const post = postIndex.get(p);
+  if (post) return post.draft ? `links to ${p}, which is still a draft (it would 404 once this post is live)` : null;
+  const slug = p.split('/').pop();
+  if (bySlug.has(slug)) return `links to ${p}, but that post lives at ${bySlug.get(slug)}`;
+  return `links to ${p}, which doesn't exist`;
 }
 
 async function checkPost(dir) {
@@ -126,13 +155,19 @@ async function checkPost(dir) {
     }
     const abs = resolveImage(img.src, dir);
     if (!existsSync(abs)) {
-      const msg = `${at(img.line)} ${label} points to a missing file (${rel(abs)})`;
-      // Inline code like `![alt](./x.png)` (left by import-draft) is not rendered, so it can't break the build.
-      const inCode = /`[^`]*$/.test(scan.split('\n')[img.line - bodyStartLine]?.split('![')[0] ?? '');
-      (img.cover || !inCode ? buildBreakers : errors).push(msg);
+      // Astro can't build any post, draft or not, whose image file is missing.
+      buildBreakers.push(`${at(img.line)} ${label} points to a missing file (${rel(abs)})`);
       continue;
     }
     for (const w of await imageWarnings(abs)) warnings.push(`${at(img.line)} ${label} ${w}`);
+  }
+
+  // Internal links must point at a published page (a link to a draft 404s in production).
+  for (const m of scan.matchAll(/(?<!!)\[[^\]]*\]\(\s*<?(\/[^)\s>]*)>?(?:\s+["'][^"']*["'])?\s*\)|\bhref=["'](\/[^"']*)["']/g)) {
+    const href = m[1] ?? m[2];
+    if (href.startsWith('//')) continue;
+    const problem = internalLinkProblem(href);
+    if (problem) errors.push(`${at(bodyStartLine - 1 + lineOf(scan, m.index))} ${problem}`);
   }
 
   // Mermaid diagrams become images: accDescr is the alt text, accTitle the caption.

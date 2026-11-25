@@ -1,83 +1,122 @@
 ---
-title: "E8 Audit Tool — Automated Essential Eight Assessment"
+title: "E8 Audit Tool: automating Essential Eight checks, then threat-modelling my own code"
 date: 2026-02-01
+updated: 2026-12-02
 type: project
-summary: "Built a Flask platform that automates Essential Eight maturity assessment across four ASD controls and correlates findings against 200,000+ live CVE records."
-tags: [compliance, web-app, nvd-api]
+summary: "A Flask app that scores four Essential Eight controls and links patch status to live NVD CVE data, followed by a STRIDE threat model of the tool itself."
+tags: [essential-eight, flask, nvd, threat-modelling, appsec]
 featured: true
 draft: false
 ---
 
-## Executive Summary
+The E8 Audit Tool is a Flask web app that automates part of an Essential Eight maturity assessment. I built it to answer a better question than "are we patched?": what are we exposed to right now? This post covers how it works, then turns the same scrutiny on the tool itself, because a security tool nobody has threat-modelled is just more attack surface.
 
-**Scenario.** Essential Eight maturity assessments at small orgs are often run from manual spreadsheets — slow, inconsistent, and disconnected from live vulnerability data.
+## What it does
 
-**Impact.** A Flask web app that automates assessment across four ASD-mandated controls, maps results to ACSC Maturity Levels 1–3, and correlates patch status against the NIST NVD's 200,000+ CVE records.
+The tool checks four of the eight controls in ASD's Essential Eight:
 
-**Action.** Designed the control checks and scoring model, integrated the NVD API for live CVE correlation, and rendered stakeholder dashboards with Chart.js.
+- Patch management
+- Microsoft Office macro hardening
+- Restriction of administrative privileges
+- Backup status
 
-## 1. Context & Goals
+Each control runs as an independent check and returns a maturity score. An explicit rubric maps each result to ACSC Maturity Levels 1 to 3, so two assessors running the tool on the same environment get the same answer. The scores then roll up into an overall posture.
 
-The Australian Essential Eight is the baseline most local organisations are measured against,
-yet the assessment itself is frequently a manual, spreadsheet-driven exercise. I built the E8
-Audit Tool to automate that process and, crucially, to tie a static compliance checklist to
-**live vulnerability intelligence** — answering not just "are we patched?" but "what are we
-exposed to right now?"
+The patch-management check does the most work. It takes the software an organisation declares, queries the NIST National Vulnerability Database for CVEs affecting it, and weights the result by severity. A Chart.js dashboard gives managers the headline score, and engineers can drill down to the exact CVEs behind a low patch score.
 
-## 2. Tools & Environment
+## How it fits together
 
-- **Backend:** Python + Flask
-- **Vulnerability data:** NIST NVD API (200,000+ CVE records)
-- **Visualisation:** Chart.js dashboards for non-technical stakeholders
-- **Mapping:** ACSC Essential Eight Maturity Levels 1–3
-- **Controls assessed:** patch management, macro hardening, admin-privilege auditing, backup status
-
-## 3. The Investigation
-
-The platform runs each control as an independent check that returns a maturity score, then
-aggregates them into an overall posture. The most valuable piece is the patch-management
-check, which queries the NVD for CVEs affecting declared software and weights the result by
-severity:
-
-```python
-import httpx
-
-NVD = "https://services.nvd.nist.gov/rest/json/cves/2.0"
-
-def cves_for(product: str, version: str) -> list[dict]:
-    cpe = f"cpe:2.3:a:*:{product}:{version}:*:*:*:*:*:*:*"
-    r = httpx.get(NVD, params={"cpeName": cpe}, timeout=30)
-    r.raise_for_status()
-    return r.json().get("vulnerabilities", [])
+```mermaid
+flowchart LR
+  accTitle: E8 Audit Tool data flow
+  accDescr: The assessor's browser sends answers and declared software to the Flask app over HTTPS. The app stores results and cached CVE data in SQLite and queries the NVD API with an API key.
+  subgraph server [Server trust boundary]
+    app[Flask app]
+    db[(SQLite)]
+  end
+  user([Assessor browser]) -- "answers, declared software (HTTPS)" --> app
+  app -- "results, NVD cache" --> db
+  app -- "CVE lookups + API key (HTTPS)" --> nvd[NVD API v2]
 ```
 
-Each control maps to a maturity level using an explicit rubric so results are repeatable and
-defensible:
+Everything outside the trust boundary is untrusted input. That includes the obvious one, the assessor's browser, and the less obvious one: the NVD. CVE descriptions are third-party text, and the app displays them.
 
-```python
-def maturity(level_signals: dict) -> int:
-    if level_signals["ml3"]:
-        return 3
-    if level_signals["ml2"]:
-        return 2
-    return 1 if level_signals["ml1"] else 0
+## Threat-modelling my own tool with STRIDE
+
+For each STRIDE category I wrote down where it could bite this app and what the control should be.
+
+| STRIDE | Where it could bite | The control |
+| --- | --- | --- |
+| Spoofing | A hard-coded Flask `SECRET_KEY` lets anyone forge session cookies | Secret from the environment, long and random, rotated if it ever lands in git |
+| Tampering | Declared software names or answers concatenated into SQL | Parameterised queries everywhere |
+| Repudiation | Assessment answers changed with no record of who or when | Append-only change log per assessment |
+| Information disclosure | The NVD API key committed to the repo; Flask debug mode left on | Key in an environment variable; debug mode off outside development |
+| Denial of service | Every dashboard view calling the NVD API and hitting its rate limit | Cache NVD responses in SQLite and pace requests |
+| Elevation of privilege | CVE descriptions or software names rendered as HTML: stored XSS | Jinja autoescaping on, never `\|safe` on untrusted text |
+
+## Three risks worth checking first
+
+### 1. User input reaching SQL
+
+Declared software names come straight from the assessor. The difference between the vulnerable and safe versions is one line:
+
+```python del={2} ins={4}
+# Vulnerable: user input becomes part of the SQL statement
+db.execute(f"SELECT * FROM software WHERE name = '{name}'")
+# Safe: the driver keeps the query and the data apart
+db.execute("SELECT * FROM software WHERE name = ?", (name,))
 ```
 
-Results feed Chart.js dashboards so a manager sees posture at a glance while an engineer can
-drill into the specific CVEs driving a low patch score.
+With the input `x' OR '1'='1`, the first query returns every row in the table and the second returns none.
 
-## 4. Findings & Recommendations
+### 2. Third-party text in the dashboard
 
-- **Automation removes drift.** Codifying the rubric eliminated the inconsistency of manual
-  spreadsheet scoring between assessors.
-- **Live correlation adds urgency.** Linking patch status to current CVEs reframed compliance
-  as active risk rather than a checkbox.
-- **Recommendations for adopters:** cache NVD responses to respect rate limits, and schedule
-  re-assessment so the posture reflects newly disclosed vulnerabilities.
+NVD descriptions and declared software names both end up on screen. Jinja escapes them by default, and that protection disappears the moment a template uses `|safe` on them. Chart.js draws onto a canvas, so chart labels themselves aren't an HTML injection point. The risk sits in the parts around the chart: custom HTML tooltips, legends and the drill-down CVE table.
 
-## 5. Skills Demonstrated
+### 3. The NVD key and its rate limits
 
-- **Compliance frameworks** — practical command of the ASD Essential Eight and ACSC maturity model.
-- **API integration** — consumed and normalised large-scale CVE data from the NIST NVD.
-- **Full-stack delivery** — Flask backend through to stakeholder-facing dashboards.
-- **Risk communication** — translated technical findings into views non-technical owners can act on.
+The NVD allows 5 requests in a rolling 30-second window without an API key and 50 with one, and still recommends pausing between requests ([NVD developer guide](https://nvd.nist.gov/developers/start-here)). The client should keep the key out of the code, let the HTTP library encode the query, and cache results so dashboard views don't call the API at all:
+
+```python
+NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+API_KEY = os.environ.get("NVD_API_KEY", "")  # from the environment, never the repo
+
+
+def fetch_cves(keyword: str) -> dict:
+    resp = requests.get(
+        NVD_URL,
+        params={"keywordSearch": keyword, "resultsPerPage": 50},  # requests encodes these
+        headers={"apiKey": API_KEY},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    time.sleep(2)  # NVD asks clients to pause between requests
+    return resp.json()
+```
+
+## The review checks, in one place
+
+```bash
+# static analysis
+semgrep --config p/python --config p/flask .
+
+# secrets in the repo and its history
+gitleaks detect --source .
+
+# known-vulnerable dependencies
+pip-audit -r requirements.txt
+
+# quick greps for the usual suspects
+grep -rn "SECRET_KEY\|debug=True" .
+grep -rn "|safe" templates/
+```
+
+## What building it taught me
+
+Codifying the rubric removed the inconsistency you get when assessors score Essential Eight controls by hand. Linking patch status to live CVEs changed how the results read: compliance stopped looking like a checkbox and started looking like current risk. Anyone adopting the approach should cache NVD responses and schedule re-assessments, because new vulnerabilities are disclosed every day.
+
+Threat-modelling the tool taught me something else. The most interesting attack surface wasn't the obvious input box. It was the trusted feed: data from a government API that the app was quietly treating as safe to display.
+
+## Next
+
+An Essential Eight extension for AI controls is next on my roadmap. The question I want it to answer: what does "restrict administrative privileges" mean when an AI agent is the one holding the credentials?
