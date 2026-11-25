@@ -10,20 +10,20 @@ featured: true
 draft: false
 ---
 
-Most JWT writeups are written from the attacker's side. As the author of this challenge I had to write the bug on purpose, and that made the root cause very plain: the server let the token decide how the token should be checked.
+Most JWT writeups come from the attacker's side. I wrote this challenge, which meant writing the bug on purpose, and doing that made the root cause really obvious: the server let the token decide how it should be checked.
 
 > [!NOTE]
-> The code in this post is a trimmed-down version of the challenge. Every snippet was run as written: the forged token gets the flag from the vulnerable app, the fixed app answers 401, and the Semgrep rule flags only the unsafe code.
+> The code here is a trimmed-down version of the challenge. I ran every snippet as written: the forged token gets the flag from the vulnerable app, the fixed app returns 401, and the Semgrep rule only flags the unsafe code.
 
 ## The setup
 
-Players get a small Flask app and start with a normal user's `session` cookie. That cookie is a JWT. The `/admin` route returns the flag only when the token's claims say `"role": "admin"`.
+Players get a small Flask app and a normal user's `session` cookie, which is a JWT. `/admin` hands over the flag, but only if the token's claims say `"role": "admin"`.
 
 ## The intended solve
 
-1. Notice the cookie is a JWT: three base64url parts joined by dots. The first part decodes to `{"alg":"HS256","typ":"JWT"}`.
+1. Spot that the cookie is a JWT: three base64url chunks joined by dots. The first one decodes to `{"alg":"HS256","typ":"JWT"}`.
 2. Decode the middle part and find `"role": "user"`.
-3. Change the role to `admin` and send it back. The server answers 401, because the signature no longer matches. So the server does check signatures. Sometimes.
+3. Change the role to `admin` and send it back. 401, because the signature no longer matches. So the server does check signatures. Sometimes.
 4. Set the header's `alg` to `none`, drop the signature, and try again.
 
 ```python title="forge.py"
@@ -68,13 +68,13 @@ def verify_token(token: str) -> dict:
     return json.loads(b64url_decode(payload_b64))
 ```
 
-The HMAC check itself is fine. It even uses a constant-time comparison. The problem is two lines earlier: the attacker's own header chooses whether that check runs at all.
+The HMAC check itself is fine. It even does a constant-time comparison. The problem is two lines earlier, where the attacker's own header decides whether that check runs at all.
 
 ## Root cause
 
-The server lets untrusted input choose the security control. `none` is a real algorithm in the JWT standards (RFC 7518 defines it for unsecured tokens), so any verifier that reads `alg` from the token and obeys it will accept unsigned tokens.
+The server lets untrusted input pick the security control. `none` is a real algorithm in the JWT standards (RFC 7518 defines it for unsecured tokens), so any verifier that reads `alg` from the token and does what it says will accept unsigned tokens.
 
-The same shape turns up well beyond JWTs: a request field that picks the authentication method, a client-side role flag, a `debug` parameter. When I review code now, I ask the same question of every check: who decides whether this runs?
+The same shape turns up well outside JWTs: a request field that picks the authentication method, a role flag set on the client, a `debug` parameter. When I review code now, I ask one question of every check: who decides whether this runs?
 
 ## The fix
 
@@ -95,13 +95,11 @@ def verify_token(token: str) -> dict:
         abort(401)
 ```
 
-- **A maintained library** instead of hand-rolled parsing.
-- **An explicit list of allowed algorithms.** PyJWT rejects the forged `alg: none` token here, and the app answers 401.
-- **The secret comes from the environment**, not the source code.
+It uses a maintained library instead of hand-rolled parsing, and it passes an explicit list of allowed algorithms, so PyJWT rejects the forged `alg: none` token and the app returns 401. The secret also comes from the environment now instead of sitting in the source.
 
 ## Stopping it coming back: a Semgrep rule
 
-A fix in one file doesn't stop the next developer writing the same bug. This rule flags the hand-rolled version and the two common PyJWT mistakes:
+Fixing one file doesn't stop the next developer from writing the same bug. This rule catches the hand-rolled version, plus the two common PyJWT mistakes:
 
 ```yaml title="jwt-unverified.yaml"
 rules:
@@ -122,7 +120,7 @@ rules:
       - pattern: '$HEADER["alg"] == "none"'
 ```
 
-Run against both versions, it flags only the vulnerable one:
+Against both versions, it only flags the vulnerable one:
 
 ```console
 $ semgrep --config jwt-unverified.yaml vulnerable_app.py fixed_app.py
@@ -134,14 +132,14 @@ $ semgrep --config jwt-unverified.yaml vulnerable_app.py fixed_app.py
            22┆ if header.get("alg") == "none":
 ```
 
-I also tested it on six small snippets. The four unsafe patterns were flagged. `jwt.decode(t, key, algorithms=["HS256"])`, with and without extra `options`, was not. In a real codebase this rule belongs in CI, so a pull request that reintroduces the bug fails before anyone has to spot it in review.
+I also tried it on six small snippets. It flagged the four unsafe patterns and left `jwt.decode(t, key, algorithms=["HS256"])` alone, with or without extra `options`. In a real codebase I'd put this in CI, so a pull request that brings the bug back fails before a reviewer has to notice it.
 
 ## Why I designed it this way
 
-The challenge is aimed at beginners, so I built it around three rules. Each step teaches one concept. The responses teach too: a 401 for a bad signature and a 403 for the wrong role tell a player exactly which check they're up against. And nothing depends on guessing, so a player who finishes it has learned the bug, not a trick.
+It's aimed at beginners, so I kept to a few rules. Each step teaches one idea. The responses do some of the teaching too: a 401 for a bad signature and a 403 for the wrong role tell a player exactly which check they're hitting. And nothing relies on guessing. If you finish it, you understand the bug well enough to spot it in someone else's code.
 
-## For developers, in three lines
+## If you're a developer
 
 - Never let a token choose its own algorithm.
 - Use a maintained library and always pass `algorithms=` explicitly.
-- Put a rule like the one above in CI so the bug can't return.
+- Put a rule like the one above in CI so it can't sneak back in.

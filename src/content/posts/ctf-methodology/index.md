@@ -8,17 +8,17 @@ featured: true
 draft: false
 ---
 
-In the Project Black graduate CTF I cleared all nine flags, bonuses included. In the Vanguard Cyber CTF I cleared every flag. I'm not the fastest player in the room and I don't know every trick. What gets me to the end is a loop I run the same way on every challenge. It's also the loop I want running in my head on a client's application, which is why I'm writing it down.
+I cleared all nine flags in the Project Black graduate CTF, bonuses included, and every flag in the Vanguard Cyber CTF. I'm not the fastest player in the room and I definitely don't know every trick. What I do have is a loop I run the same way on every challenge, and it's the same loop I want running in my head when I'm looking at a client's application. So I'm writing it down.
 
 ## The loop
 
-1. **Read everything twice before touching anything.** The title, the description, the points value and every attached file. I write down each noun I see: file names, usernames, version numbers, odd phrasing. The title is often the biggest hint on the page.
-2. **Open a notes file first.** If I can't explain afterwards how I got a flag, I didn't learn anything from it. My template is below.
-3. **Triage.** Work out what I'm actually looking at before I pick a tool. A file extension, a banner or a header is a claim, not a fact, until I've checked it.
-4. **Write one hypothesis and give it a timebox.** Usually 20 minutes. "The session cookie is a JWT and the server trusts its `alg` header" is a hypothesis. "Try things in Burp" is not.
-5. **Run the smallest test that proves or kills it.** One request, one command. I log the result even when it fails, because a dead end I've written down is one I won't walk into twice.
-6. **When the timebox runs out, change layer.** If I've been staring at encoding, I move to the protocol. If I've been on the protocol, I move to application logic. Then I ask what the author wanted me to learn. Building challenges for CSECcon made that question far more useful, because I now know how much thought goes into the intended path.
-7. **After the flag, write two lines:** why it worked, and how a developer would fix it. The second line is the one a real report needs, and it's the one most CTF notes leave out.
+1. Read everything twice before touching anything. Title, description, points value, every attached file. I jot down every noun I see: file names, usernames, version numbers, anything oddly phrased. The title is often the biggest hint on the page.
+2. Open a notes file first. If I can't explain afterwards how I got a flag, I didn't really learn anything. My template is below.
+3. Triage. Work out what I'm actually looking at before picking a tool. A file extension, a banner or a header is only a claim until I've checked it.
+4. Write down one hypothesis and give it a timebox, usually 20 minutes. "The session cookie is a JWT and the server trusts its `alg` header" is a hypothesis. "Try things in Burp" isn't.
+5. Run the smallest test that proves or kills it. One request, one command. I log the result even when it fails, so I don't walk into the same dead end twice.
+6. When the timebox runs out, change layer. If I've been staring at encoding, I move to the protocol. If I've been on the protocol, I look at the application logic. Then I ask what the author wanted me to learn. Building challenges for CSECcon made that question a lot more useful, because now I know how much thought goes into the intended path.
+7. After the flag, write two lines: why it worked, and how a developer would fix it. A real report needs that second line, and it's the one most CTF notes skip.
 
 ## The notes file
 
@@ -42,7 +42,7 @@ Goal:
 ## Real-world fix
 ```
 
-The split between Facts and Hypotheses matters most. Facts only hold things I've seen myself: a response header, a file signature, an error message. Guesses go under Hypotheses. Keeping them apart stops me building three steps on top of something I only assumed.
+If I could only keep one part of this, it'd be the Facts/Hypotheses split. Facts is only for things I've actually seen, like a response header, a file signature or an error message. Guesses go under Hypotheses. It sounds fussy, but it's what stops me building three steps on top of something I only assumed.
 
 ## First five minutes by category
 
@@ -68,18 +68,18 @@ xxd challenge.bin | head -n 20    # magic bytes vs the extension
 
 ### A web foothold: Hack The Box's Reactor
 
-Applied to Reactor, the loop looks like this:
+On Reactor, it went like this:
 
-- **Facts:** port 3000 open, an `X-Powered-By: Next.js` response header, scripts loading from `/_next/static/chunks/`.
-- **Hypothesis:** the framework itself is the way in. The smallest useful test is identifying the version, not fuzzing directories.
-- **Result:** Next.js 15.0.3, which is affected by CVE-2025-55182, a pre-authentication remote code execution bug in React Server Components.
-- **Fix line:** upgrade to a patched release.
+- Facts: port 3000 open, an `X-Powered-By: Next.js` response header, scripts loading from `/_next/static/chunks/`.
+- Hypothesis: the framework itself is the way in. The smallest useful test is identifying the version, not fuzzing directories.
+- Result: Next.js 15.0.3, which is affected by CVE-2025-55182, a pre-authentication remote code execution bug in React Server Components.
+- Fix line: upgrade to a patched release.
 
 The [full writeup](/writeups/htb-reactor) covers the rest of the chain.
 
 ### A forensics file that is really two files
 
-An image whose file size is far bigger than its dimensions can explain is a classic forensics pattern, and one I later used when building challenges. The loop keeps it short:
+An image that's far bigger on disk than its dimensions can explain is a classic forensics setup. I've since used it in challenges I built myself. With the loop, it doesn't take long:
 
 ```console
 $ file cat.png
@@ -92,12 +92,12 @@ warning [cat.png]:  75 extra bytes at beginning or within zipfile
  extracting: flag.txt
 ```
 
-`file` only reads the first few bytes, so it reports a PNG. The ZIP signature `PK\x03\x04` sitting at byte 75 says a second file has been glued onto the end. `unzip` reads an archive from its end, finds the ZIP, and complains about the 75 bytes of image in front of it. The real-world version is data hidden inside an innocent-looking upload, and the fix is to validate uploads by their content, not their name.
+`file` only reads the first few bytes, so it says PNG. The ZIP signature `PK\x03\x04` at byte 75 means someone glued a second file onto the end. `unzip` reads an archive from its end, finds the ZIP and grumbles about the 75 bytes of image in front of it. Outside a CTF, this is data hidden in an upload that looks harmless, and the fix is to check uploads by what's in them rather than what they're called.
 
 ## My setup
 
-Kali Linux in UTM on my MacBook, with Burp Suite, Wireshark, CyberChef and the standard command-line tools. Nothing exotic. The loop matters more than the toolbox.
+Kali Linux in UTM on my MacBook, with Burp Suite, Wireshark, CyberChef and the usual command-line tools. Nothing fancy. Honestly, the loop has helped me more than anything on that list.
 
 ## What carries over to real work
 
-The notes habit is incident-report writing in miniature: evidence, reasoning, conclusion, in that order. Timeboxing is how a real test gets scoped, because a client pays for coverage, not for one rabbit hole. Writing the fix after every flag is the habit I most want to bring into application security work. Finding the bug is half the job. Explaining how to stop it coming back is the half the client keeps.
+The notes file is basically a small incident report: what I saw, what I think it means, what I concluded. Timeboxing matters even more on a real test, where the client is paying for coverage and won't thank me for three hours down one rabbit hole. But the habit I most want to bring into application security work is the last one, writing the fix after every flag. Finding a bug feels great. The fix is what the client actually walks away with.

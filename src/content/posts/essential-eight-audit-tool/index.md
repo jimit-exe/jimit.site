@@ -9,7 +9,7 @@ featured: true
 draft: false
 ---
 
-The E8 Audit Tool is a Flask web app that automates part of an Essential Eight maturity assessment. I built it to answer a better question than "are we patched?": what are we exposed to right now? This post covers how it works, then turns the same scrutiny on the tool itself, because a security tool nobody has threat-modelled is just more attack surface.
+The E8 Audit Tool is a Flask web app that automates part of an Essential Eight maturity assessment. I wanted it to answer something more useful than "are we patched?", which is "what are we exposed to right now?". This post explains how it works and then threat-models the tool itself. A security tool nobody has threat-modelled is just more attack surface, and it felt hypocritical to skip that step on my own code.
 
 ## What it does
 
@@ -20,9 +20,9 @@ The tool checks four of the eight controls in ASD's Essential Eight:
 - Restriction of administrative privileges
 - Backup status
 
-Each control runs as an independent check and returns a maturity score. An explicit rubric maps each result to ACSC Maturity Levels 1 to 3, so two assessors running the tool on the same environment get the same answer. The scores then roll up into an overall posture.
+Each control is its own check and returns a maturity score. A written rubric maps each result to ACSC Maturity Levels 1 to 3, so two assessors running the tool on the same environment get the same answer. The scores then roll up into an overall posture.
 
-The patch-management check does the most work. It takes the software an organisation declares, queries the NIST National Vulnerability Database for CVEs affecting it, and weights the result by severity. A Chart.js dashboard gives managers the headline score, and engineers can drill down to the exact CVEs behind a low patch score.
+Patch management is where most of the work happens. It takes the software an organisation declares, looks up CVEs for it in the NIST National Vulnerability Database, and weights the result by severity. Managers get a headline score on a Chart.js dashboard, and engineers can drill down to the exact CVEs behind a low patch score.
 
 ## How it fits together
 
@@ -39,7 +39,7 @@ flowchart LR
   app -- "CVE lookups + API key (HTTPS)" --> nvd[NVD API v2]
 ```
 
-Everything outside the trust boundary is untrusted input. That includes the obvious one, the assessor's browser, and the less obvious one: the NVD. CVE descriptions are third-party text, and the app displays them.
+Anything coming from outside the trust boundary is untrusted input. The assessor's browser is the obvious one. The NVD is easier to forget, but CVE descriptions are third-party text and the app displays them.
 
 ## Threat-modelling my own tool with STRIDE
 
@@ -58,7 +58,7 @@ For each STRIDE category I wrote down where it could bite this app and what the 
 
 ### 1. User input reaching SQL
 
-Declared software names come straight from the assessor. The difference between the vulnerable and safe versions is one line:
+Declared software names come straight from the assessor. The vulnerable and safe versions differ by one line:
 
 ```python del={2} ins={4}
 # Vulnerable: user input becomes part of the SQL statement
@@ -71,11 +71,11 @@ With the input `x' OR '1'='1`, the first query returns every row in the table an
 
 ### 2. Third-party text in the dashboard
 
-NVD descriptions and declared software names both end up on screen. Jinja escapes them by default, and that protection disappears the moment a template uses `|safe` on them. Chart.js draws onto a canvas, so chart labels themselves aren't an HTML injection point. The risk sits in the parts around the chart: custom HTML tooltips, legends and the drill-down CVE table.
+NVD descriptions and declared software names both end up on screen. Jinja escapes them by default, but that protection is gone the moment a template uses `|safe` on them. Chart.js draws onto a canvas, so the chart labels themselves can't inject HTML. The risk is in the bits around the chart: custom HTML tooltips, legends and the drill-down CVE table.
 
 ### 3. The NVD key and its rate limits
 
-The NVD allows 5 requests in a rolling 30-second window without an API key and 50 with one, and still recommends pausing between requests ([NVD developer guide](https://nvd.nist.gov/developers/start-here)). The client should keep the key out of the code, let the HTTP library encode the query, and cache results so dashboard views don't call the API at all:
+The NVD allows 5 requests in a rolling 30-second window without an API key and 50 with one, and still recommends pausing between requests ([NVD developer guide](https://nvd.nist.gov/developers/start-here)). So the client keeps the key out of the code, lets the HTTP library encode the query, and caches results so viewing the dashboard doesn't call the API at all:
 
 ```python
 NVD_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
@@ -113,10 +113,10 @@ grep -rn "|safe" templates/
 
 ## What building it taught me
 
-Codifying the rubric removed the inconsistency you get when assessors score Essential Eight controls by hand. Linking patch status to live CVEs changed how the results read: compliance stopped looking like a checkbox and started looking like current risk. Anyone adopting the approach should cache NVD responses and schedule re-assessments, because new vulnerabilities are disclosed every day.
+Writing the rubric down got rid of the inconsistency you get when people score Essential Eight controls by hand. Linking patch status to live CVEs also changed how the results read. A score tied to real CVEs reads as current risk, which is far more useful than a compliance tick. If you try this approach, cache the NVD responses and schedule re-assessments, because new vulnerabilities come out every day.
 
-Threat-modelling the tool taught me something else. The most interesting attack surface wasn't the obvious input box. It was the trusted feed: data from a government API that the app was quietly treating as safe to display.
+Threat-modelling the tool surprised me. The input box I worried about first turned out to be the boring part. The more interesting risk was the feed I trusted: text from a government API that the app had been treating as safe to display without anyone really questioning it.
 
 ## Next
 
-An Essential Eight extension for AI controls is next on my roadmap. The question I want it to answer: what does "restrict administrative privileges" mean when an AI agent is the one holding the credentials?
+Next on my list is an Essential Eight extension for AI controls. The question I keep coming back to: what does "restrict administrative privileges" mean when an AI agent is the one holding the credentials?

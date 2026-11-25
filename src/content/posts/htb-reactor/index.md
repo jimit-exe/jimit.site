@@ -9,7 +9,7 @@ featured: true
 draft: false
 ---
 
-Reactor's foothold is a CVSS 10.0 bug in a framework that real companies ship every day. Every step after that is a configuration mistake I could imagine finding on a client engagement: passwords stored as unsalted MD5, the same password reused for SSH, and a debugger left switched on in a root process. So alongside the walkthrough, this writeup ends the way a report would: findings, fixes, and how a defender would have caught each step.
+Reactor's foothold is a CVSS 10.0 bug in a framework plenty of real companies ship. Everything after that is a configuration mistake I could easily imagine finding on a client engagement: unsalted MD5 passwords, the same password reused for SSH, and a debugger left switched on in a root process. So after the walkthrough I've written it up the way I would in a report, with the findings, the fixes and how a defender could have caught each step.
 
 > [!NOTE]
 > Hack The Box only allows public writeups of retired machines. Flags, hashes and passwords are left out of this post.
@@ -30,7 +30,7 @@ Commands below use `$TARGET` for the machine's IP address.
 nmap -sC -sV -oN reactor.nmap $TARGET
 ```
 
-The scan showed SSH on port 22 and a web application on port 3000. The response headers and page source gave the framework away:
+SSH on port 22 and a web app on port 3000. The response headers and page source gave the framework away pretty quickly:
 
 ```bash
 curl -sI http://$TARGET:3000/ | grep -i x-powered-by
@@ -40,13 +40,13 @@ curl -sI http://$TARGET:3000/ | grep -i x-powered-by
 X-Powered-By: Next.js
 ```
 
-Scripts loaded from `/_next/static/chunks/`, the layout of a Next.js App Router build. The application was Next.js 15.0.3, a version in the range affected by React2Shell. That changed the plan: instead of fuzzing for hidden pages, the first thing to test was the framework itself.
+Scripts were loading from `/_next/static/chunks/`, which is how a Next.js App Router build is laid out. The app turned out to be Next.js 15.0.3, inside the range affected by React2Shell. That changed my plan. Instead of fuzzing for hidden pages, I went after the framework first.
 
 ## Foothold: CVE-2025-55182 (React2Shell)
 
-React Server Components move data between server and browser using the Flight protocol. In vulnerable versions, the server deserialises attacker-supplied Flight data unsafely, and a crafted `__proto__` reference turns into code execution. No login is needed and one HTTP request is enough. It was disclosed on 3 December 2025 and rated CVSS 10.0 ([Hack The Box threat spotlight](https://www.hackthebox.com/blog/react2shell-cve-2025-55182-threat-spotlight)).
+React Server Components pass data between server and browser using the Flight protocol. In vulnerable versions the server deserialises Flight data from the client unsafely, and a crafted `__proto__` reference ends up as code execution. You don't need to log in, and one HTTP request does it. It was disclosed on 3 December 2025 and rated CVSS 10.0 ([Hack The Box threat spotlight](https://www.hackthebox.com/blog/react2shell-cve-2025-55182-threat-spotlight)).
 
-I used a public proof of concept rather than writing my own exploit. This writeup is about the chain and the fixes, so the payload isn't reproduced here. It landed a shell as the `node` user inside the application directory:
+I used a public proof of concept rather than writing my own. I care more about the chain and the fixes here, so I haven't reproduced the payload. It gave me a shell as the `node` user, sitting in the application directory:
 
 ```console
 node@reactor:/opt/reactor-app$ ls
@@ -55,7 +55,7 @@ app  next.config.js  node_modules  package.json  package-lock.json  reactor.db
 
 ## Credentials from the application database
 
-A SQLite database sitting next to the code is always worth a look:
+A SQLite file sitting right next to the code? Always worth a look:
 
 ```console
 node@reactor:/opt/reactor-app$ sqlite3 reactor.db '.schema users'
@@ -68,17 +68,17 @@ CREATE TABLE users (
 );
 ```
 
-The table held two accounts, `admin` and `engineer`. Each `password_hash` was 32 hexadecimal characters with no salt stored anywhere: raw MD5.
+Two accounts, `admin` and `engineer`. Each `password_hash` was 32 hex characters with no salt stored anywhere, so raw MD5.
 
 ```bash
 hashcat -m 0 engineer.hash /usr/share/wordlists/rockyou.txt
 ```
 
-Mode `0` is hashcat's mode for raw MD5. The `engineer` hash fell to the rockyou wordlist. The cracked password also worked for SSH as `engineer`, which turned a web application bug into an interactive login on the host.
+Mode `0` is hashcat's raw MD5 mode. The `engineer` hash fell to rockyou, and the same password worked for SSH as `engineer`. So a bug in the web app had just become an interactive login on the host.
 
 ## Privilege escalation: a debugger left open on a root process
 
-As `engineer`, the listening sockets and the process list told the rest of the story:
+Logged in as `engineer`, I checked the listening sockets and the process list:
 
 ```console
 engineer@reactor:~$ ss -tlnp
@@ -86,7 +86,7 @@ engineer@reactor:~$ ps aux | grep -i node
 root   1407 ... /usr/bin/node --inspect=127.0.0.1:9229 /opt/uptime-monitor/worker.js
 ```
 
-Port 9229 is Node's default inspector port. `--inspect` exposes a debugging interface that will evaluate any JavaScript inside the running process. This process runs as root, so anyone who can reach the port can run code as root. Binding it to 127.0.0.1 stops nobody who already has a local shell, and I had one.
+9229 is Node's default inspector port. `--inspect` opens a debugging interface that will run any JavaScript you hand it inside the process. This process was running as root, so anyone who could reach that port could run code as root. Binding it to 127.0.0.1 doesn't help much against someone who already has a local shell, and I had one.
 
 I forwarded the port over SSH and attached Node's built-in debugger client:
 
@@ -101,7 +101,7 @@ debug> exec process.mainModule.require('child_process').execSync('id').toString(
 'uid=0(root) gid=0(root) groups=0(root)\n'
 ```
 
-A plain `require` isn't in scope when the debugger evaluates an expression in the global context, which is why the call goes through `process.mainModule.require`. From there, root access was one more command.
+The call goes through `process.mainModule.require` because a plain `require` isn't in scope when the debugger evaluates something in the global context. After that, a root shell was one more command away.
 
 ## What the client report would say
 
@@ -115,10 +115,10 @@ A plain `require` isn't in scope when the debugger evaluates an expression in th
 ## How a defender catches each step
 
 > [!DEFENDER]
-> None of these steps is quiet if someone is watching the right logs.
+> Every step here is noisy if someone is watching the right logs.
 
-- **The exploit attempt:** POST requests carrying `next-action` or `rsc-action-id` headers that don't match the app's real server actions, or request bodies containing `__proto__` ([Hack The Box threat spotlight](https://www.hackthebox.com/blog/react2shell-cve-2025-55182-threat-spotlight)).
-- **Code execution:** a Node process spawning `sh`, `id` or `whoami`. A web application server rarely runs other programs, so logging every program the service account starts is low-noise:
+- Exploit attempts show up as POST requests with `next-action` or `rsc-action-id` headers that don't match any of the app's real server actions, or with `__proto__` in the body ([Hack The Box threat spotlight](https://www.hackthebox.com/blog/react2shell-cve-2025-55182-threat-spotlight)).
+- Code execution looks like a Node process spawning `sh`, `id` or `whoami`. A web app server rarely starts other programs, so logging everything the service account runs doesn't add much noise:
 
 ```bash
 # /etc/audit/rules.d/webapp.rules
@@ -128,13 +128,13 @@ A plain `require` isn't in scope when the debugger evaluates an expression in th
 
 Review hits with `ausearch -k webapp_exec`.
 
-- **The open debugger:** a hardening check that runs `ps -eo user,args | grep -- '--inspect'` should return nothing on a production host.
-- **The SSH login:** a first-ever interactive login for an account that normally only runs a service is worth an alert on its own.
+- The open debugger is easy to catch before anyone abuses it. `ps -eo user,args | grep -- '--inspect'` should return nothing on a production host, which makes it a cheap line in any hardening check.
+- The SSH login was the first interactive login ever for an account that normally just runs a service. That's worth an alert by itself.
 
 ## What I took from it
 
-Fingerprint the framework before fuzzing anything. Version numbers are cheap to find, and a known bug in the framework beats any number of hidden directories.
+Fingerprint the framework before you fuzz anything. Finding a version number takes a minute, and a known bug in the framework will get you further than any number of hidden directories.
 
-Credentials in an application database are rarely only application credentials. Once the same password opens the host, a web bug becomes a host compromise.
+Credentials in an application database are rarely just application credentials. The moment that password opened SSH, a web bug turned into a host compromise.
 
-Debug features are remote code execution waiting for a local user. `--inspect`, Flask's debug mode and exposed Java debug ports all have the same shape, and they're worth a dedicated line in every review checklist.
+And debug features deserve their own line in every review checklist. `--inspect`, Flask's debug mode and exposed Java debug ports all have the same problem: give a local user access to one and they can run code as whoever owns the process.

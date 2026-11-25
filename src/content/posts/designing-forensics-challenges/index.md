@@ -7,11 +7,11 @@ tags: [ctf, forensics, dfir, teaching, csec]
 draft: false
 ---
 
-Forensics challenges can easily turn into a game of guessing what the author had in mind. When I started building challenges for CSECcon, UTS CSEC's annual conference, I set myself one rule: a beginner should finish knowing how an analyst thinks, not just a trick. Before building anything, I reached out to a DFIR professional at Canva for input on what beginner challenges should teach.
+Forensics challenges can easily turn into a game of guess-what-the-author-was-thinking. When I started building challenges for CSECcon, UTS CSEC's annual conference, I gave myself one rule: a beginner should come out knowing a bit about how an analyst thinks. A clever trick on its own doesn't count. Before I built anything, I reached out to a DFIR professional at Canva and asked what they thought beginner challenges should teach.
 
 ## The rule I design by
 
-Every challenge has to mirror something a real analyst would see, and the solve has to use a skill they would use on the job. If the only way in is guessing, the challenge is broken.
+Each challenge should look like something a real analyst might actually run into, and solving it should use a skill they'd use at work. If the only way in is guessing, I've built it wrong.
 
 ## The challenge set
 
@@ -25,9 +25,9 @@ Every challenge has to mirror something a real analyst would see, and the solve 
 
 ## Worked example 1: DNS exfiltration
 
-The capture holds ordinary browsing plus a run of queries to one domain with long, random-looking subdomains. Each subdomain carries a chunk of the flag, base32-encoded so it only uses characters a DNS label allows.
+The capture is mostly ordinary browsing, plus a run of queries to one domain with long, random-looking subdomains. Each subdomain carries a chunk of the flag, base32-encoded so it only uses characters allowed in a DNS label.
 
-The decode needs two fixes that real exfiltration analysis needs too. Resolvers retry, so some queries repeat and have to be de-duplicated. And DNS labels can't contain `=`, so the base32 padding is stripped before sending and has to be added back before decoding.
+Decoding it needs two fixes you'd need on real exfiltration traffic too. Resolvers retry, so some queries show up twice and need de-duplicating. And DNS labels can't contain `=`, so the base32 padding gets stripped before sending and has to go back on before decoding.
 
 ```bash
 tshark -r dns.pcap -Y 'dns.flags.response == 0' -T fields -e dns.qry.name \
@@ -39,17 +39,17 @@ tshark -r dns.pcap -Y 'dns.flags.response == 0' -T fields -e dns.qry.name \
 python3 -c "import base64; s=open('chunks.txt').read().strip(); print(base64.b32decode(s + '=' * (-len(s) % 8)).decode())"
 ```
 
-On a test capture built the same way, with one retry duplicated on purpose, that prints:
+On a test capture built the same way, with one retry duplicated on purpose, that gives:
 
 ```console
 CSEC{dns_tunnels_leave_footprints}
 ```
 
-There's a weakness worth pointing out to players. De-duplicating by value breaks if two chunks happen to be identical. Real tunnelling tools add a sequence number to each query for exactly this reason, and spotting that difference is a good conversation starter about how real tools are built.
+There's a catch I like pointing out to players: de-duplicating by value breaks if two chunks happen to be identical. Real tunnelling tools put a sequence number in each query for exactly this reason, and that usually gets people talking about how real tools are built.
 
 ## Worked example 2: the commit that wasn't deleted
 
-The player gets a Git repository whose history looks clean. Someone committed a config file with a secret in it, noticed, and ran `git reset --hard` to make it go away.
+The player gets a Git repository with a clean-looking history. Someone committed a config file with a secret in it, noticed, and ran `git reset --hard` to make it go away.
 
 ```console
 $ git fsck --lost-found
@@ -58,20 +58,20 @@ $ git show 288436b6:.env
 API_KEY=CSEC{dangling_commits_remember}
 ```
 
-`git reset --hard` moves the branch pointer back, but the commit object stays in `.git/objects` until garbage collection prunes it. `git fsck` lists objects that nothing points to any more, and `git show` reads a file straight out of one of them. The lesson carries straight into real work: a secret that was ever committed, and especially one that was ever pushed, should be treated as leaked and rotated. Rewriting history doesn't un-leak it.
+`git reset --hard` moves the branch pointer back, but the commit object stays in `.git/objects` until garbage collection prunes it. `git fsck` lists objects that nothing points to any more, and `git show` reads a file straight out of one of them. This one applies directly to real work. If a secret was ever committed, and especially if it was ever pushed, treat it as leaked and rotate it. Rewriting history doesn't un-leak it.
 
-The third classic, a ZIP glued onto the end of a PNG, is walked through in my [CTF methodology post](/blog/ctf-methodology).
+The other classic, a ZIP glued onto the end of a PNG, is in my [CTF methodology post](/blog/ctf-methodology).
 
 ## Hints that teach
 
-Hints work best as a ladder, where each rung gives a little more away:
+I write hints as a ladder, where each rung gives away a bit more:
 
-1. **Where to look:** "Not all DNS traffic is browsing."
-2. **What to measure:** "Compare subdomain lengths across domains."
-3. **What to do:** "The alphabet is A to Z and 2 to 7."
+1. Where to look: "Not all DNS traffic is browsing."
+2. What to measure: "Compare subdomain lengths across domains."
+3. What to do: "The alphabet is A to Z and 2 to 7."
 
-A player who needs only the first hint still did the investigation. A player who needs all three still leaves knowing what base32 looks like and why an attacker would choose it.
+Someone who only needs the first hint still did the investigation themselves. Someone who needs all three at least leaves knowing what base32 looks like and why an attacker would pick it.
 
 ## What building challenges taught me as a player
 
-I now ask "what did the author want me to learn?" whenever I'm stuck, and it gets me unstuck more often than any tool does. Good challenges and good reports share a structure: evidence, reasoning, conclusion. And explaining a bug to a beginner turns out to be the same skill as explaining it to a developer. Both need the root cause in one sentence and a fix they can act on.
+Whenever I'm stuck now, I ask what the author wanted me to learn, and that gets me unstuck more often than any tool. The other surprise was how much challenge design has in common with report writing. Explaining a bug to a beginner is pretty much the same job as explaining it to a developer: both want the root cause in a sentence and a fix they can actually do something with.

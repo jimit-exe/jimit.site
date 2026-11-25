@@ -8,7 +8,7 @@ tags: [python, scapy, flask-socketio, network-analysis, xss, appsec]
 draft: false
 ---
 
-I built the Network Traffic Analyzer to understand the wire formats I test against, by watching them live instead of reading static captures after the fact. It captures packets with Scapy, reduces each one to a compact record, and streams the records to a browser dashboard over WebSockets. I generate the traffic in my VMware attack and detection lab.
+I built the Network Traffic Analyzer because I wanted to see the protocols I test against while they're happening, not in a static capture afterwards. It captures packets with Scapy, boils each one down to a small record, and streams those records to a browser dashboard over WebSockets. The traffic comes from my VMware attack and detection lab.
 
 ## What it does
 
@@ -75,11 +75,11 @@ Capture runs as a background task so the web server stays responsive, and `store
 
 ## What the live view showed
 
-Watching traffic live builds intuition faster than reading a capture afterwards. During an ARP cache-poisoning test in my lab, the spike in ARP replies was obvious on the dashboard. In a static capture, the same pattern is something you have to go looking for.
+During an ARP cache-poisoning test in my lab, the spike in ARP replies jumped straight out on the dashboard. In a static capture I'd have had to go looking for that same pattern. That's the main reason I like watching traffic live.
 
 ## The bug class hiding in every packet
 
-Every field on the dashboard comes from a packet, and anyone on the network can put almost anything in a packet. A DNS name is the easiest example. Feeding the summariser a crafted query shows the text arriving intact:
+Every field on the dashboard comes from a packet, and anyone on the network can put almost anything in a packet. DNS names are the easiest example. Feed the summariser a crafted query and the text comes through untouched:
 
 ```console
 $ python3 test_capture.py | grep DNS
@@ -87,7 +87,7 @@ $ python3 test_capture.py | grep DNS
 {'time': 1795589570.835511, 'len': 98, 'proto': 'DNS', 'src': '10.0.0.66', 'dst': '1.1.1.1', 'info': '<img src=x onerror=alert(1)>.evil.test.'}
 ```
 
-That's correct behaviour for the capture side: it should report exactly what was on the wire. The danger is on the browser side. If the dashboard builds rows with `innerHTML` or a template string, that DNS name becomes a live `<img>` tag and its `onerror` handler runs in the analyst's browser. The person watching for attacks becomes the target.
+That's what the capture side should do, since its job is to report exactly what was on the wire. The danger is in the browser. If the dashboard builds rows with `innerHTML` or a template string, that DNS name turns into a real `<img>` tag and its `onerror` handler runs in the analyst's browser. So the person watching for attacks is the one getting attacked.
 
 ```javascript del={2-3}
 // Unsafe: packet text becomes HTML
@@ -95,7 +95,7 @@ rows.insertAdjacentHTML("afterbegin",
   `<tr><td>${p.proto}</td><td>${p.src}</td><td>${p.dst}</td><td>${p.info}</td></tr>`);
 ```
 
-The fix is to treat packet fields as text, always:
+The fix is to always treat packet fields as text:
 
 ```javascript title="dashboard.js"
 const socket = io();
@@ -113,7 +113,7 @@ socket.on("packet", (p) => {
 });
 ```
 
-I checked both versions against the payload above in a headless DOM. The template-string version created an `<img>` element. The `textContent` version created none and displayed the payload as plain text.
+I ran both versions against that payload in a headless DOM. The template-string version created an `<img>` element. The `textContent` version didn't, and just showed the payload as text.
 
 To test a running dashboard in the lab, send the payload from another VM and watch what the browser does:
 
@@ -127,18 +127,18 @@ send(IP(dst="10.0.0.1") / UDP(dport=53) /
 
 ## Other things the tool needs before anyone else runs it
 
-- **Least privilege.** Packet capture needs raw-socket access; the web dashboard doesn't. Capture with the minimum privilege instead of running the whole app as root.
-- **Exposure.** A dashboard on `0.0.0.0` with no login shows your network's traffic to anyone who can reach it. Bind it to `127.0.0.1`, as the code above does, or put authentication in front of it.
-- **Scope.** Only capture on networks you own or are authorised to monitor.
+- Packet capture needs raw-socket access, but the web dashboard doesn't. Give capture the least privilege it needs instead of running the whole app as root.
+- A dashboard on `0.0.0.0` with no login shows your network's traffic to anyone who can reach it. Bind it to `127.0.0.1` like the code above does, or put authentication in front of it.
+- Only capture on networks you own or are authorised to monitor.
 
 ## What it catches and what it misses
 
-It's good at patterns you can see in headers alone: ARP floods and poisoning, DNS lookups, SYN-heavy connection patterns, chatty hosts. It sees nothing inside TLS beyond the endpoints and ports. The version above labels traffic by layer, not by application protocol, so HTTP shows up as TCP to port 80. And a Python callback plus one WebSocket message per packet won't keep up with a busy link. Filtering at capture time is what kept the dashboard responsive under the load I generated, which is why the BPF filter matters as much as any line of Python.
+It's good at anything you can see from headers alone: ARP floods and poisoning, DNS lookups, SYN-heavy connection patterns, chatty hosts. Inside TLS it sees nothing beyond the endpoints and ports. The version above labels traffic by layer rather than application protocol, so HTTP just shows up as TCP to port 80. And a Python callback plus one WebSocket message per packet won't keep up with a busy link. Filtering at capture time is what kept the dashboard responsive under the load I generated, so honestly the BPF filter matters as much as any of the Python.
 
 ## What's next
 
-Signature-based alerting for known attack patterns, and PCAP export so any interesting session can be replayed in Wireshark.
+Signature-based alerts for known attack patterns, and PCAP export so I can replay anything interesting in Wireshark.
 
 ## What I learned
 
-Real-time visibility builds intuition about protocol behaviour faster than static captures do, and filtering is what makes high-volume capture usable. The bigger lesson was the XSS: a defensive tool is still an application, and the data it watches is written by the people it's watching for.
+Watching protocols live taught me more, and faster, than static captures did, and filtering is what made high-volume capture usable at all. The XSS was the bigger lesson, though. A defensive tool is still an application, and the data it watches is written by the people it's watching for.
