@@ -1,0 +1,45 @@
+{
+  "name": "newportfolio",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "npm run check:posts && npm run check:security-txt && astro build && node scripts/csp-postbuild.mjs && pagefind --site dist && node scripts/check-dist.mjs",
+    "preview": "astro preview",
+    "astro": "astro",
+    "new": "node scripts/new-post.mjs",
+    "import-draft": "node scripts/import-draft.mjs",
+    "check:posts": "node scripts/check-posts.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
+    "clean": "rm -rf .astro node_modules/.astro node_modules/.vite dist",
+    "check:security-txt": "node scripts/check-security-txt.mjs"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^7.3.10",
+    "@astrojs/rss": "^4.0.19",
+    "@astrojs/sitemap": "^3.7.6",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "astro": "^7.4.13",
+    "astro-expressive-code": "^0.44.4",
+    "mini-svg-data-uri": "^1.4.4",
+    "pagefind": "^1.6.0",
+    "playwright": "^1.65.1",
+    "rehype-autolink-headings": "^7.1.0",
+    "rehype-mermaid": "^3.0.0",
+    "remark-github-blockquote-alert": "^2.1.1",
+    "unist-util-visit": "^5.2.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "sharp": "^0.35.5",
+    "typescript": "^5.9.3",
+    "yaml": "^2.9.1"
+  },
+  "overrides": {
+    "katex": "^0.18.11"
+  }
+}

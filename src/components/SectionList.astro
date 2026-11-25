@@ -1,0 +1,53 @@
+---
+import Base from '../layouts/Base.astro';
+import PostCard from './PostCard.astro';
+import type { Post } from '../lib/posts';
+
+interface Props {
+  title: string;
+  command: string;
+  intro: string;
+  posts: Post[];
+  empty: string;
+}
+const { title, command, intro, posts, empty } = Astro.props;
+---
+
+<Base title={title} description={intro}>
+  <div class="container page">
+    <p class="prompt">{command}</p>
+    <h1>{title}</h1>
+    <p class="intro">{intro}</p>
+    <slot name="filters" />
+    {
+      posts.length > 0 ? (
+        <ul class="card-grid" id="post-list">
+          {posts.map((post) => (
+            <li
+              data-f-tag={`|${post.data.tags.join('|')}|`}
+              data-f-platform={`|${post.data.platform ?? ''}|`}
+              data-f-type={`|${post.data.type}|`}
+            >
+              <PostCard post={post} headingLevel="h2" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="empty mono">{empty}</p>
+      )
+    }
+  </div>
+</Base>
+
+<style>
+  .page { padding-top: clamp(2.5rem, 8vw, 4.5rem); }
+  h1 { margin: 0.5rem 0 0.5rem; font-size: clamp(2rem, 5vw, 2.75rem); letter-spacing: -0.03em; }
+  .intro { max-width: 60ch; color: var(--muted); margin: 0 0 2rem; }
+  .empty {
+    padding: 2rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+</style>

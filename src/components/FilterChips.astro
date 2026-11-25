@@ -1,0 +1,140 @@
+---
+/**
+ * Filter chips for a post list. Progressive enhancement: the bar stays hidden
+ * until the script runs, and tag pages still work without JavaScript.
+ * List items carry `data-f-<group>="|value|value|"`.
+ */
+interface Group {
+  key: string;
+  label: string;
+  values: { value: string; count: number }[];
+}
+interface Props {
+  groups: Group[];
+  total: number;
+}
+const { groups, total } = Astro.props;
+const shown = groups.filter((g) => g.values.length >= 2);
+---
+
+{
+  shown.length > 0 && (
+    <div class="filters" id="filters" hidden data-total={total}>
+      {shown.map((g) => (
+        <div class="group" role="group" aria-labelledby={`f-${g.key}`}>
+          <span class="group-label mono" id={`f-${g.key}`}>{g.label}</span>
+          <ul class="chips">
+            <li>
+              <button type="button" class="chip" data-group={g.key} data-value="" aria-pressed="true">
+                all
+              </button>
+            </li>
+            {g.values.map(({ value, count }) => (
+              <li>
+                <button type="button" class="chip" data-group={g.key} data-value={value} aria-pressed="false">
+                  {value} <span class="n" aria-hidden="true">{count}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+      <p class="status mono" role="status" aria-live="polite" id="filter-status"></p>
+      <div class="no-match" id="no-match" hidden>
+        <p>No posts match these filters.</p>
+        <button type="button" class="btn" id="clear-filters">Clear filters</button>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  const bar = document.getElementById('filters');
+  const list = document.getElementById('post-list');
+  if (bar && list) {
+    const items = [...list.children] as HTMLElement[];
+    const chips = [...bar.querySelectorAll<HTMLButtonElement>('button.chip')];
+    const status = document.getElementById('filter-status')!;
+    const noMatch = document.getElementById('no-match')!;
+    const groups = [...new Set(chips.map((c) => c.dataset.group!))];
+    const active: Record<string, string> = {};
+
+    const params = new URLSearchParams(location.search);
+    for (const g of groups) {
+      const v = params.get(g) ?? '';
+      // Only accept values that exist as chips; ignore anything else in the URL.
+      active[g] = chips.some((c) => c.dataset.group === g && c.dataset.value === v) ? v : '';
+    }
+
+    const apply = () => {
+      let visible = 0;
+      for (const li of items) {
+        const ok = groups.every((g) => !active[g] || (li.dataset[`f${g[0].toUpperCase()}${g.slice(1)}`] ?? '').includes(`|${active[g]}|`));
+        li.hidden = !ok;
+        if (ok) visible++;
+      }
+      for (const c of chips) c.setAttribute('aria-pressed', String(active[c.dataset.group!] === c.dataset.value));
+      const filtered = groups.some((g) => active[g]);
+      status.textContent = filtered ? `Showing ${visible} of ${items.length}` : '';
+      noMatch.hidden = visible > 0;
+
+      const url = new URL(location.href);
+      for (const g of groups) active[g] ? url.searchParams.set(g, active[g]) : url.searchParams.delete(g);
+      history.replaceState(null, '', url);
+    };
+
+    bar.addEventListener('click', (e) => {
+      const chip = (e.target as Element).closest<HTMLButtonElement>('button.chip');
+      if (!chip) return;
+      active[chip.dataset.group!] = chip.dataset.value!;
+      apply();
+    });
+    document.getElementById('clear-filters')!.addEventListener('click', () => {
+      for (const g of groups) active[g] = '';
+      apply();
+    });
+
+    bar.hidden = false;
+    apply();
+  }
+</script>
+
+<style>
+  .filters {
+    display: grid;
+    gap: 0.9rem;
+    margin: 0 0 2rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 0.9rem; }
+  .group-label {
+    flex: 0 0 5.5rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; list-style: none; margin: 0; padding: 0; flex: 1; }
+  .chip {
+    min-height: 1.75rem;
+    padding: 0.2rem 0.7rem;
+    font: 0.8rem/1.4 var(--font-mono);
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .chip:hover { color: var(--accent); border-color: var(--accent); }
+  .chip[aria-pressed='true'] { color: var(--on-accent); background: var(--accent); border-color: var(--accent); }
+  .chip .n { margin-left: 0.25rem; opacity: 0.7; }
+  .status { margin: 0; font-size: 0.8rem; color: var(--muted); }
+  .status:empty { display: none; }
+  .no-match p { margin: 0 0 0.6rem; }
+  @media (max-width: 36rem) {
+    .group-label { flex-basis: 100%; }
+  }
+</style>

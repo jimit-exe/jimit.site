@@ -1,0 +1,54 @@
+/* Long-form post body. Tuned for 15-minute reads: ~70ch measure, generous rhythm. */
+.prose { max-width: var(--measure); }
+:where(.prose) :where(p, ul, ol) { margin-block: 0; }
+.prose > * + * { margin-top: 1.25em; }
+
+.prose h2 {
+  font-size: 1.55em;
+  margin-top: 2.4em;
+  margin-bottom: 0;
+  padding-top: 0.25em;
+}
+.prose h3 { font-size: 1.2em; margin-top: 1.9em; margin-bottom: 0; }
+.prose h4 { font-size: 1em; margin-top: 1.6em; margin-bottom: 0; }
+.prose h2 + *, .prose h3 + *, .prose h4 + * { margin-top: 0.75em; }
+
+.prose ul, .prose ol { padding-left: 1.4em; }
+.prose li + li { margin-top: 0.4em; }
+.prose li > ul, .prose li > ol { margin-top: 0.4em; }
+.prose ul li::marker { color: var(--accent); }
+.prose ol li::marker { color: var(--muted); font-family: var(--font-mono); font-size: 0.9em; }
+
+.prose strong { color: var(--text-strong); font-weight: 650; }
+
+.prose :not(pre) > code {
+  padding: 0.12em 0.38em;
+  border-radius: 5px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  color: var(--text-strong);
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+
+.prose hr { border: 0; border-top: 1px solid var(--border); margin-block: 2.5em; }
+
+.prose blockquote {
+  margin-inline: 0;
+  padding: 0.25em 0 0.25em 1.1em;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+.prose img { border-radius: 8px; }
+
+/* Fallback styling for plain code blocks (Expressive Code replaces this in phase 2). */
+.prose pre {
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--code-bg);
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.65;
+}

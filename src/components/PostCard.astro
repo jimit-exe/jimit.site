@@ -1,0 +1,70 @@
+---
+import { postUrl, TYPE_LABEL, formatDate, isoDate, type Post } from '../lib/posts';
+
+interface Props {
+  post: Post;
+  headingLevel?: 'h2' | 'h3';
+}
+const { post, headingLevel = 'h3' } = Astro.props;
+const { title, summary, type, date, tags, platform, difficulty, draft } = post.data;
+const Heading = headingLevel;
+---
+
+<article class="card">
+  <div class="meta">
+    <span class="badge">{TYPE_LABEL[type]}</span>
+    {platform && <span class="mono muted small">{platform}</span>}
+    {difficulty && <span class="mono muted small">· {difficulty}</span>}
+    {draft && <span class="draft-pill">draft</span>}
+  </div>
+  <Heading class="title">
+    <a href={postUrl(post)}>{title}</a>
+  </Heading>
+  <p class="summary">{summary}</p>
+  <div class="foot">
+    <time class="mono muted small" datetime={isoDate(date)}>{formatDate(date)}</time>
+    <ul class="tags" aria-label="Tags">
+      {tags.slice(0, 4).map((t) => <li><a class="tag" href={`/tags/${t}`}>{t}</a></li>)}
+    </ul>
+  </div>
+</article>
+
+<style>
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    height: 100%;
+    padding: 1.25rem 1.25rem 1.1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .card:hover, .card:focus-within { border-color: var(--accent); }
+  @media (prefers-reduced-motion: no-preference) {
+    .card:hover { transform: translateY(-2px); }
+  }
+  .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  .small { font-size: 0.75rem; }
+  .title { margin: 0; font-size: 1.15rem; line-height: 1.35; }
+  .title a { color: var(--text-strong); text-decoration: none; }
+  /* Whole card is clickable via the title link. */
+  .title a::after { content: ''; position: absolute; inset: 0; border-radius: var(--radius); }
+  .title a:focus-visible { outline: none; }
+  .title a:focus-visible::after { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .summary { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.6; flex: 1; }
+  /* Tag links sit above the card-wide title link so they stay clickable. */
+  .foot .tags { position: relative; z-index: 1; }
+  .foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+  .draft-pill {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0 0.4rem;
+    border-radius: 4px;
+    background: #b45309;
+    color: #fff;
+  }
+</style>

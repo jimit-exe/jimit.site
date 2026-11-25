@@ -1,0 +1,249 @@
+---
+import { render } from 'astro:content';
+import { Image, getImage } from 'astro:assets';
+import Base from './Base.astro';
+import Toc from '../components/Toc.astro';
+import ImageZoom from '../components/ImageZoom.astro';
+import { site } from '../lib/site';
+import PostCard from '../components/PostCard.astro';
+import {
+  SECTION, TYPE_LABEL, formatDate, isoDate, readingTime, postUrl, getAdjacent, getRelated, type Post,
+} from '../lib/posts';
+
+interface Props {
+  post: Post;
+}
+const { post } = Astro.props;
+const { title, summary, date, updated, type, tags, cover, coverAlt, platform, difficulty, repo, draft } = post.data;
+const { Content, headings } = await render(post);
+const minutes = readingTime(post.body);
+const section = SECTION[type];
+const sectionLabel = { writeups: 'Writeups', blog: 'Blog', projects: 'Projects' }[section];
+const showToc = headings.filter((h) => h.depth === 2 && h.slug !== 'footnote-label').length >= 3;
+const { prev, next } = await getAdjacent(post);
+const related = await getRelated(post);
+const typePlural = { writeup: 'writeup', methodology: 'methodology post', blog: 'blog post', project: 'project' }[type];
+
+// Share image: the cover resized to the 1200 px Open Graph size, as JPEG for the widest support.
+const og = cover
+  ? await getImage({ src: cover, width: Math.min(1200, cover.width), format: 'jpeg', quality: 82 })
+  : undefined;
+---
+
+<Base
+  title={title}
+  description={summary}
+  type="article"
+  publishedTime={date}
+  image={og?.src}
+  imageWidth={og ? Number(og.attributes.width) : undefined}
+  imageHeight={og ? Number(og.attributes.height) : undefined}
+  imageAlt={coverAlt}
+  tags={tags}
+  noindex={draft}
+>
+  {
+    draft && (
+      <div class="draft-banner" role="status">
+        <strong>DRAFT</strong> — visible in local preview only. Set <code>draft: false</code> to publish.
+      </div>
+    )
+  }
+  <div class:list={['post-shell container', { 'has-toc': showToc }]}>
+    <article class="post" data-pagefind-body>
+      <header class="post-head">
+        <nav class="crumbs mono" aria-label="Breadcrumb" data-pagefind-ignore>
+          <a href={`/${section}`}>← {sectionLabel}</a>
+        </nav>
+        <div class="meta-top" data-pagefind-ignore>
+          <span class="badge" data-pagefind-meta="type" data-pagefind-filter="type">{TYPE_LABEL[type]}</span>
+          {platform && <span class="mono muted">{platform}</span>}
+          {difficulty && <span class="mono muted">· {difficulty}</span>}
+        </div>
+        <h1>{title}</h1>
+        <p class="summary">{summary}</p>
+        <p class="meta mono" data-pagefind-ignore>
+          <time datetime={isoDate(date)} data-pagefind-meta="date">{formatDate(date)}</time>
+          {
+            updated && (
+              <>
+                <span aria-hidden="true"> · </span>Updated <time datetime={isoDate(updated)}>{formatDate(updated)}</time>
+              </>
+            )
+          }
+          <span aria-hidden="true"> · </span>{minutes} min read
+        </p>
+        <ul class="tags" aria-label="Tags">
+          {
+            tags.map((t) => (
+              <li>
+                <a class="tag" href={`/tags/${t}`}>
+                  {t}
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </header>
+
+      {
+        cover && (
+          <figure class="cover">
+            <Image
+              src={cover}
+              alt={coverAlt ?? ''}
+              widths={[720, 1080, 1440].filter((w) => w <= cover.width)}
+              sizes="(min-width: 50rem) 46rem, 100vw"
+              loading="eager"
+              fetchpriority="high"
+            />
+          </figure>
+        )
+      }
+
+      {showToc && <div data-pagefind-ignore><Toc headings={headings} variant="inline" /></div>}
+
+      <div class="prose">
+        <Content />
+      </div>
+
+      {
+        repo && (
+          <p class="repo">
+            <a class="btn btn-primary" href={repo} target="_blank" rel="noopener noreferrer">
+              View code →
+            </a>
+          </p>
+        )
+      }
+
+      <footer class="post-foot" data-pagefind-ignore="all">
+        <slot name="footer" />
+        {
+          (prev || next) && (
+            <nav class="pager" aria-label={`More ${typePlural}s`}>
+              {prev ? (
+                <a class="pager-link prev" href={postUrl(prev)} rel="prev">
+                  <span class="pager-dir mono">← Previous {typePlural}</span>
+                  <span class="pager-title">{prev.data.title}</span>
+                </a>
+              ) : <span />}
+              {next && (
+                <a class="pager-link next" href={postUrl(next)} rel="next">
+                  <span class="pager-dir mono">Next {typePlural} →</span>
+                  <span class="pager-title">{next.data.title}</span>
+                </a>
+              )}
+            </nav>
+          )
+        }
+        {
+          related.length > 0 && (
+            <section class="related" aria-labelledby="related-heading">
+              <h2 id="related-heading" class="related-heading mono">Related posts</h2>
+              <ul class="card-grid">
+                {related.map((p) => (
+                  <li><PostCard post={p} headingLevel="h3" /></li>
+                ))}
+              </ul>
+            </section>
+          )
+        }
+        <p class="contact">
+          Questions or feedback? <a href={`mailto:${site.email}`}>Email me</a> or find me on{' '}
+          <a href={site.links.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>.
+        </p>
+      </footer>
+    </article>
+
+    {
+      showToc && (
+        <aside class="toc-col" data-pagefind-ignore="all">
+          <Toc headings={headings} variant="side" />
+        </aside>
+      )
+    }
+  </div>
+  <ImageZoom />
+</Base>
+
+<style>
+  .draft-banner {
+    background: #b45309;
+    color: #fff;
+    text-align: center;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+  }
+  .draft-banner code { color: #fff; }
+
+  .post-shell {
+    max-width: calc(var(--measure) + 2 * var(--gutter));
+    padding-top: clamp(2rem, 6vw, 3.5rem);
+  }
+  .post { min-width: 0; }
+  .toc-col { display: none; }
+
+  /* Wide screens: sticky contents sidebar to the right of the text column. */
+  @media (min-width: 76rem) {
+    .post-shell.has-toc {
+      max-width: calc(var(--measure) + 15rem + 4rem + 2 * var(--gutter));
+      display: grid;
+      grid-template-columns: minmax(0, var(--measure)) 15rem;
+      column-gap: 4rem;
+    }
+    .has-toc .toc-col { display: block; padding-top: 14rem; }
+    .has-toc :global(.toc-inline) { display: none; }
+  }
+
+  .crumbs a { font-size: 0.8125rem; text-decoration: none; color: var(--muted); }
+  .crumbs a:hover { color: var(--accent); }
+  .meta-top { display: flex; align-items: center; gap: 0.5rem; margin-top: 1.5rem; font-size: 0.8rem; }
+  h1 { margin: 0.75rem 0 0.75rem; font-size: clamp(1.9rem, 5vw, 2.75rem); letter-spacing: -0.03em; }
+  .summary { margin: 0 0 1rem; font-size: 1.15em; color: var(--muted); line-height: 1.6; }
+  .meta { margin: 0 0 0.75rem; font-size: 0.8rem; color: var(--muted); }
+  .post-head { padding-bottom: 1.75rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+  .cover { margin: 0 0 2rem; }
+  .cover :global(img) { border-radius: var(--radius); border: 1px solid var(--border); display: block; max-width: 100%; height: auto; }
+  .repo { margin: 2.5rem 0 0; }
+  .post-foot { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  .contact { font-size: 0.95rem; color: var(--muted); margin: 2.5rem 0 0; }
+
+  .pager {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  .pager-link {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-decoration: none;
+    color: var(--text-strong);
+  }
+  .pager-link:hover { border-color: var(--accent); }
+  .pager-link.next { text-align: right; grid-column: 2; }
+  .pager-dir { font-size: 0.75rem; color: var(--muted); }
+  .pager-title { font-weight: 600; line-height: 1.35; }
+  @media (max-width: 36rem) {
+    .pager { grid-template-columns: 1fr; }
+    .pager > span:empty { display: none; }
+    .pager-link.next { grid-column: auto; }
+  }
+
+  .related { margin-top: 2.5rem; }
+  .related-heading {
+    margin: 0 0 1rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .related .card-grid { grid-template-columns: 1fr; }
+</style>

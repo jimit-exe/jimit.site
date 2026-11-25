@@ -1,0 +1,20 @@
+---
+import SectionList from '../../components/SectionList.astro';
+import FilterChips from '../../components/FilterChips.astro';
+import { getPosts, inSection, countBy } from '../../lib/posts';
+const posts = await getPosts(inSection('writeups'));
+const groups = [
+  { key: 'platform', label: 'Platform', values: countBy(posts, (p) => p.data.platform) },
+  { key: 'tag', label: 'Tag', values: countBy(posts, (p) => p.data.tags) },
+];
+---
+
+<SectionList
+  title="Writeups"
+  command="ls ~/writeups"
+  intro="CTF and lab writeups: the chain from enumeration to impact, then the root cause, the fix, and how a defender would catch it."
+  posts={posts}
+  empty="First writeups are on the way."
+>
+  <FilterChips slot="filters" groups={groups} total={posts.length} />
+</SectionList>

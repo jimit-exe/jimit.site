@@ -1,0 +1,20 @@
+---
+import SectionList from '../../components/SectionList.astro';
+import FilterChips from '../../components/FilterChips.astro';
+import { getPosts, inSection, countBy } from '../../lib/posts';
+const posts = await getPosts(inSection('blog'));
+const groups = [
+  { key: 'type', label: 'Type', values: countBy(posts, (p) => p.data.type) },
+  { key: 'tag', label: 'Tag', values: countBy(posts, (p) => p.data.tags) },
+];
+---
+
+<SectionList
+  title="Blog"
+  command="ls ~/blog"
+  intro="Methodology notes and longer posts on how I approach security problems."
+  posts={posts}
+  empty="First posts are on the way."
+>
+  <FilterChips slot="filters" groups={groups} total={posts.length} />
+</SectionList>

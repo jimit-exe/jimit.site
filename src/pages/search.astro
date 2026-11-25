@@ -1,0 +1,160 @@
+---
+import Base from '../layouts/Base.astro';
+// Pagefind compiles WebAssembly, which CSP only allows with 'wasm-unsafe-eval'. Only this page gets it.
+Astro.csp?.insertScriptResource("'wasm-unsafe-eval'");
+---
+
+<Base title="Search" description="Search every writeup, project and post on jimit.site." noindex>
+  <div class="container page">
+    <p class="prompt">grep -ri</p>
+    <h1>Search</h1>
+    <form class="search-form" role="search" id="search-form">
+      <label for="q" class="visually-hidden">Search posts</label>
+      <input
+        id="q"
+        name="q"
+        type="search"
+        placeholder="e.g. prompt injection, nmap, Essential Eight"
+        autocomplete="off"
+        spellcheck="false"
+        maxlength="100"
+      />
+    </form>
+    <p class="status mono" id="search-status" role="status" aria-live="polite"></p>
+    <ol class="results" id="results"></ol>
+    <noscript>
+      <p>Search needs JavaScript. You can browse by <a href="/tags">tag</a> instead.</p>
+    </noscript>
+    <p class="browse mono">Or browse <a href="/writeups">writeups</a> · <a href="/blog">blog</a> · <a href="/projects">projects</a> · <a href="/tags">tags</a></p>
+  </div>
+</Base>
+
+<script>
+  type Result = { url: string; excerpt: string; meta: { title?: string; type?: string; date?: string } };
+  type Pagefind = {
+    options: (o: object) => Promise<void>;
+    debouncedSearch: (q: string, o?: object, ms?: number) => Promise<{ results: { data: () => Promise<Result> }[] } | null>;
+  };
+
+  const form = document.getElementById('search-form') as HTMLFormElement;
+  const input = document.getElementById('q') as HTMLInputElement;
+  const list = document.getElementById('results')!;
+  const status = document.getElementById('search-status')!;
+  let pagefind: Pagefind | undefined;
+
+  async function load(): Promise<Pagefind | undefined> {
+    if (pagefind) return pagefind;
+    try {
+      // Built by `pagefind --site dist` after `astro build`; not present in `astro dev`.
+      const path = '/pagefind/pagefind.js';
+      pagefind = (await import(/* @vite-ignore */ path)) as Pagefind;
+      await pagefind.options({ excerptLength: 24 });
+      return pagefind;
+    } catch {
+      status.textContent = import.meta.env.DEV
+        ? 'The search index is created by npm run build, so search only works in a production build or preview.'
+        : 'Search failed to load. Try again, or browse by tag.';
+      return undefined;
+    }
+  }
+
+  /** Pagefind excerpts are text with <mark> around matches. Keep only those two node types. */
+  function excerptNodes(html: string): Node[] {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    return [...tpl.content.childNodes].map((n) => {
+      if (n.nodeType === Node.ELEMENT_NODE && (n as Element).tagName === 'MARK') {
+        const m = document.createElement('mark');
+        m.textContent = n.textContent;
+        return m;
+      }
+      return document.createTextNode(n.textContent ?? '');
+    });
+  }
+
+  // Pagefind records the built file path (/writeups/x.html); the site serves clean URLs.
+  const cleanUrl = (u: string) => u.replace(/\.html$/, '').replace(/\/index$/, '/') || '/';
+
+  function render(results: Result[], q: string) {
+    list.replaceChildren(
+      ...results.map((r) => {
+        const li = document.createElement('li');
+        li.className = 'result';
+        const meta = document.createElement('p');
+        meta.className = 'result-meta mono';
+        meta.textContent = [r.meta.type, r.meta.date].filter(Boolean).join(' · ');
+        const h = document.createElement('h2');
+        const a = document.createElement('a');
+        a.href = cleanUrl(r.url);
+        a.textContent = r.meta.title ?? a.href;
+        h.append(a);
+        const p = document.createElement('p');
+        p.className = 'result-excerpt';
+        p.append(...excerptNodes(r.excerpt));
+        li.append(meta, h, p);
+        return li;
+      }),
+    );
+    const n = results.length;
+    status.textContent = n ? `${n} ${n === 1 ? 'result' : 'results'} for “${q}”` : `No results for “${q}”.`;
+  }
+
+  async function run() {
+    const q = input.value.trim();
+    const url = new URL(location.href);
+    q ? url.searchParams.set('q', q) : url.searchParams.delete('q');
+    history.replaceState(null, '', url);
+    if (!q) {
+      list.replaceChildren();
+      status.textContent = '';
+      return;
+    }
+    const pf = await load();
+    if (!pf) return;
+    try {
+      const search = await pf.debouncedSearch(q, {}, 200);
+      if (search === null) return; // superseded by a newer keystroke
+      const data = await Promise.all(search.results.slice(0, 20).map((r) => r.data()));
+      if (input.value.trim() === q) render(data, q);
+    } catch {
+      status.textContent = 'Search failed to load. Try again, or browse by tag.';
+    }
+  }
+
+  // The CSP sets form-action 'none', so the form never submits; Enter just searches.
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    run();
+  });
+  input.addEventListener('input', run);
+
+  const initial = new URLSearchParams(location.search).get('q');
+  if (initial) input.value = initial.slice(0, 100);
+  input.focus();
+  if (initial) run();
+  else load();
+</script>
+
+<style>
+  .page { padding-top: clamp(2.5rem, 8vw, 4.5rem); max-width: 48rem; }
+  h1 { font-size: clamp(2rem, 5vw, 2.75rem); margin: 0.5rem 0 1.25rem; letter-spacing: -0.03em; }
+  .search-form input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    font: 1rem/1.4 var(--font-mono);
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .search-form input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-color: var(--accent); }
+  .status { min-height: 1.4em; margin: 1rem 0; font-size: 0.85rem; color: var(--muted); }
+  .results { list-style: none; padding: 0; margin: 0; }
+  .results :global(.result) { padding: 1.1rem 0; border-top: 1px solid var(--border); }
+  .results :global(.result-meta) { margin: 0; font-size: 0.75rem; color: var(--muted); }
+  .results :global(h2) { margin: 0.3rem 0 0.4rem; font-size: 1.2rem; line-height: 1.35; }
+  .results :global(h2 a) { color: var(--text-strong); }
+  .results :global(.result-excerpt) { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.6; }
+  .results :global(mark) { background: var(--accent-soft); color: var(--text-strong); padding: 0 0.1em; border-radius: 2px; }
+  .browse { margin-top: 2.5rem; font-size: 0.85rem; color: var(--muted); }
+</style>

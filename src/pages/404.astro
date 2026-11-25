@@ -1,0 +1,55 @@
+---
+import Base from '../layouts/Base.astro';
+import { getPosts, postUrl } from '../lib/posts';
+const recent = (await getPosts()).slice(0, 5);
+---
+
+<Base title="Page not found" noindex>
+  <div class="container page">
+    <p class="prompt">cd $REQUEST_URI</p>
+    <p class="mono err">bash: cd: No such file or directory</p>
+    <h1>404 — page not found</h1>
+    <p>The page you asked for doesn't exist or has moved. Search for it, or start from one of these recent posts.</p>
+    <form class="search-box" role="search" id="nf-search">
+      <label for="nf-q" class="visually-hidden">Search posts</label>
+      <input id="nf-q" type="search" placeholder="Search posts" maxlength="100" autocomplete="off" />
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+    <noscript><p><a href="/search">Go to search</a> · <a href="/tags">Browse tags</a></p></noscript>
+    <ul class="recent">
+      {recent.map((p) => <li><a href={postUrl(p)}>{p.data.title}</a></li>)}
+    </ul>
+    <p><a class="btn" href="/">← Back home</a></p>
+  </div>
+</Base>
+
+<script>
+  // form-action is 'none' in the CSP, so the form never submits: go to /search instead.
+  const form = document.getElementById('nf-search') as HTMLFormElement;
+  const input = document.getElementById('nf-q') as HTMLInputElement;
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = input.value.trim();
+    location.href = q ? `/search?q=${encodeURIComponent(q)}` : '/search';
+  });
+</script>
+
+<style>
+  .page { padding-top: clamp(2.5rem, 8vw, 4.5rem); max-width: 48rem; }
+  h1 { font-size: clamp(2rem, 5vw, 2.75rem); margin: 1rem 0 0.5rem; }
+  .err { color: #c2410c; font-size: 0.85rem; margin: 0.25rem 0 0; }
+  .search-box { display: flex; gap: 0.5rem; margin: 1.25rem 0 1.5rem; max-width: 30rem; }
+  .search-box input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.6rem 0.85rem;
+    font: 0.95rem var(--font-mono);
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .search-box input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .recent { padding-left: 1.2rem; }
+  .recent li + li { margin-top: 0.4rem; }
+</style>

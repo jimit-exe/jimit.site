@@ -1,0 +1,13 @@
+---
+import SectionList from '../../components/SectionList.astro';
+import { getPosts, inSection } from '../../lib/posts';
+const posts = await getPosts(inSection('projects'));
+---
+
+<SectionList
+  title="Projects"
+  command="ls ~/projects"
+  intro="Case studies of tools and assessments I've built, each with how it works, a security review of my own code, and what I learned."
+  posts={posts}
+  empty="No projects yet."
+/>

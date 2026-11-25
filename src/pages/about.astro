@@ -1,0 +1,140 @@
+---
+import Base from '../layouts/Base.astro';
+import { site } from '../lib/site';
+
+const education = [
+  {
+    school: 'University of Technology Sydney (UTS)',
+    degree: 'Master of Information Technology (Extension) — Cybersecurity',
+    when: 'Feb 2025 – Dec 2026 · Sydney, Australia',
+    detail:
+      'GPA 6.50/7.00 · Academic Excellence International Scholarship. Coursework: Network Security, Cryptography, IoT Security, Digital Forensics, Cloud Security, Mobile Security.',
+  },
+  {
+    school: 'Indian Institute of Information Technology, Vadodara',
+    degree: 'Bachelor of Technology — Computer Science',
+    when: 'Aug 2020 – Jun 2024 · India',
+    detail: 'GPA 7.61/10.00.',
+  },
+];
+
+const skills: Record<string, string[]> = {
+  'Security Engineering': [
+    'Penetration Testing', 'Threat Modeling', 'Code Review', 'Security Tooling Development',
+    'IDS/IPS (Snort, Suricata)', 'SIEM (Elastic Stack)', 'Incident Response', 'Malware Analysis',
+  ],
+  'Web & AI Security': [
+    'Burp Suite', 'OWASP ZAP', 'SQLi / XSS / SSRF / SSTI', 'Command Injection', 'API Security Testing',
+    'Prompt Injection', 'LLM Vulnerabilities', 'AI Red Teaming',
+  ],
+  'Networking & Forensics': [
+    'Nmap', 'Wireshark', 'TCP/IP', 'Metasploit', 'Kali Linux', 'Volatility', 'MITRE ATT&CK', 'NIST CSF',
+    'Essential Eight',
+  ],
+  Development: ['Python', 'Bash', 'JavaScript (Node.js)', 'Flask', 'REST APIs', 'AWS (Cognito)'],
+};
+---
+
+<Base title="About" description="Education, technical background, and links for Jimit Patel — Offensive Security & AI Red Teaming.">
+  <div class="container page">
+    <p class="prompt">cat about.md</p>
+    <h1>{site.name}</h1>
+    <p class="role mono">{site.role}</p>
+
+    <div class="intro">
+      <p>
+        I'm a postgraduate cybersecurity student at UTS with a full-stack engineering background. After two years
+        building authentication systems and production web apps, I moved toward offensive security — where
+        understanding how software is built becomes a real advantage in taking it apart.
+      </p>
+      <p>
+        My focus is web application penetration testing and the emerging space of AI red teaming. I learn by building
+        and breaking: a self-hosted attack/detection lab, custom Python network tooling, an automated Essential Eight
+        compliance auditor, and ongoing prompt-injection research against large language models. I'm active in the
+        Australian security community through AISA, australi.ai, and UTS CSEC, and I keep sharp with CTFs and Hack The
+        Box.
+      </p>
+    </div>
+
+    <section aria-labelledby="edu">
+      <h2 id="edu">Education</h2>
+      <ol class="timeline">
+        {
+          education.map((e) => (
+            <li>
+              <h3>{e.school}</h3>
+              <p class="degree">{e.degree}</p>
+              <p class="mono muted when">{e.when}</p>
+              <p>{e.detail}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section aria-labelledby="skills">
+      <h2 id="skills">Technical Skills</h2>
+      <div class="skills">
+        {
+          Object.entries(skills).map(([group, items]) => (
+            <div class="skill-group">
+              <h3>{group}</h3>
+              <ul class="chips">
+                {items.map((s) => (
+                  <li>{s}</li>
+                ))}
+              </ul>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section aria-labelledby="links">
+      <h2 id="links">Links</h2>
+      <div class="cta">
+        <a class="btn btn-primary" href={site.resume}>Download Résumé</a>
+        <a class="btn" href={site.links.github} target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="btn" href={site.links.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        <a class="btn" href={`mailto:${site.email}`}>Email</a>
+      </div>
+    </section>
+  </div>
+</Base>
+
+<style>
+  .page { max-width: 52rem; padding-top: clamp(2.5rem, 8vw, 4.5rem); }
+  h1 { margin: 0.5rem 0 0.25rem; font-size: clamp(2.2rem, 6vw, 3.25rem); letter-spacing: -0.03em; }
+  .role { margin: 0 0 2rem; color: var(--accent); }
+  .intro p { max-width: var(--measure); }
+  h2 { margin-top: 3rem; font-size: 1.5rem; }
+  h2::before { content: '## '; font-family: var(--font-mono); color: var(--accent); font-size: 0.85em; }
+  .timeline { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--border); }
+  .timeline li { position: relative; padding: 0 0 1.5rem 1.5rem; }
+  .timeline li::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 0.45rem;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+  }
+  .timeline h3 { margin: 0; font-size: 1.1rem; }
+  .timeline p { margin: 0.2rem 0; }
+  .degree { font-weight: 500; }
+  .when { font-size: 0.8rem; }
+  .skills { display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+  .skill-group h3 { margin: 0 0 0.6rem; font-size: 0.95rem; font-family: var(--font-mono); color: var(--muted); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.4rem; list-style: none; margin: 0; padding: 0; }
+  .chips li {
+    font-size: 0.85rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .cta { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+</style>

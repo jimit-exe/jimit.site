@@ -1,0 +1,36 @@
+# Netlify: build settings and response headers for jimit.site.
+# The Content Security Policy itself is a <meta> tag in every page (Astro security.csp, with
+# hashes). A <meta> policy can't set frame-ancestors, so that one is sent here as a header.
+
+[build]
+  command = "npx playwright install --only-shell chromium && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  # Keep Playwright's Chromium inside node_modules so Netlify's dependency cache keeps it.
+  PLAYWRIGHT_BROWSERS_PATH = "0"
+  NPM_FLAGS = "--no-fund --no-audit"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=63072000; includeSubDomains"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+
+# Hashed build assets never change, so browsers can keep them for a year.
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# RFC 9116 asks for this exact media type.
+[[headers]]
+  for = "/.well-known/security.txt"
+  [headers.values]
+    Content-Type = "text/plain; charset=utf-8"

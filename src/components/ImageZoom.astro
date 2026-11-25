@@ -1,0 +1,74 @@
+---
+// Click (or Enter/Space) on a post screenshot to view it full size; Esc, click, or the
+// Close button dismisses it and focus returns to the image. Uses a native <dialog>.
+---
+
+<dialog class="zoom-dialog" id="zoom-dialog" aria-label="Enlarged image">
+  <button class="zoom-close" type="button">Close ✕</button>
+  <figure>
+    <img alt="" decoding="async" />
+    <figcaption></figcaption>
+  </figure>
+</dialog>
+
+<script>
+  const dialog = document.getElementById('zoom-dialog') as HTMLDialogElement | null;
+  const big = dialog?.querySelector('img');
+  const cap = dialog?.querySelector('figcaption');
+  let opener: HTMLElement | null = null;
+
+  /** Largest candidate from srcset, so the zoomed view is as sharp as possible. */
+  function largestSrc(img: HTMLImageElement): string {
+    const set = img.getAttribute('srcset');
+    if (!set) return img.currentSrc || img.src;
+    let best = { w: 0, url: img.currentSrc || img.src };
+    for (const part of set.split(',')) {
+      const [url, d] = part.trim().split(/\s+/);
+      const w = parseInt(d ?? '', 10);
+      if (url && w > best.w) best = { w, url };
+    }
+    return best.url;
+  }
+
+  function open(img: HTMLImageElement, trigger: HTMLElement) {
+    if (!dialog || !big || !cap) return;
+    opener = trigger;
+    big.src = largestSrc(img);
+    // Vector diagrams can scale up; bitmaps open at their own size.
+    big.classList.toggle('zoom-svg', big.src.startsWith('data:image/svg'));
+    big.alt = img.alt;
+    const caption = img.closest('figure')?.querySelector('figcaption')?.textContent ?? '';
+    cap.textContent = caption;
+    cap.hidden = !caption;
+    dialog.showModal();
+  }
+
+  /** Diagrams hold a light and a dark image; zoom whichever the current theme shows. */
+  const visibleImg = (el: Element) =>
+    [...el.querySelectorAll('img')].find((i) => i.checkVisibility()) ?? el.querySelector('img');
+
+  if (dialog) {
+    const targets = document.querySelectorAll<HTMLElement>(
+      '.prose .post-figure > img, .prose .post-figure > picture, .prose .post-figure > .mermaid-images',
+    );
+    for (const target of targets) {
+      const img = target instanceof HTMLImageElement ? target : visibleImg(target);
+      if (!img) continue;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'zoom-trigger';
+      btn.setAttribute('aria-label', `Enlarge image: ${img.alt}`);
+      target.replaceWith(btn);
+      btn.append(target);
+      btn.addEventListener('click', () => {
+        const shown = target instanceof HTMLImageElement ? target : visibleImg(target);
+        if (shown) open(shown, btn);
+      });
+    }
+    dialog.addEventListener('click', () => dialog.close());
+    dialog.addEventListener('close', () => {
+      opener?.focus();
+      if (big) big.removeAttribute('src');
+    });
+  }
+</script>

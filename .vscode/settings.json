@@ -1,0 +1,9 @@
+{
+  // Pasting or dropping an image into a post saves it beside that post's index.md.
+  "markdown.copyFiles.destination": { "src/content/posts/**/*.md": "${documentDirName}/" },
+  "markdown.copyFiles.overwriteBehavior": "nameIncrementally",
+  "markdown.editor.filePaste.enabled": "always",
+  "markdown.editor.drop.enabled": "always",
+  "files.trimTrailingWhitespace": true,
+  "[markdown]": { "files.trimTrailingWhitespace": false }
+}

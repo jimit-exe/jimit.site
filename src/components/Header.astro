@@ -1,0 +1,175 @@
+---
+import { site, cleanPath } from '../lib/site';
+
+const path = cleanPath(Astro.url.pathname);
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/writeups', label: 'Writeups' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/about', label: 'About' },
+  { href: site.resume, label: 'Résumé' },
+];
+const isActive = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(href + '/'));
+---
+
+<header class="site-header">
+  <div class="container bar">
+    <a class="logo" href="/" aria-label={`${site.name}, home`}>
+      <span class="tilde" aria-hidden="true">~/</span>jimitpatel<span class="cursor" aria-hidden="true"></span>
+    </a>
+
+    <div class="tools">
+      <a class="icon-btn" href="/search" aria-label="Search posts" title="Search">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path>
+        </svg>
+      </a>
+      <button class="icon-btn" type="button" id="theme-toggle" aria-label="Switch to dark theme" title="Toggle theme">
+        <svg class="sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+        </svg>
+        <svg class="moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="nav" aria-label="Main">
+      <ul>
+        {
+          nav.map((item) => (
+            <li>
+              <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+                {item.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const btn = document.getElementById('theme-toggle');
+  const root = document.documentElement;
+  const sync = () => {
+    const dark = root.dataset.theme === 'dark';
+    btn?.setAttribute('aria-label', dark ? 'Switch to light theme' : 'Switch to dark theme');
+    btn?.setAttribute('aria-pressed', String(dark));
+  };
+  sync();
+  btn?.addEventListener('click', () => {
+    const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try {
+      localStorage.setItem('theme', next);
+    } catch {}
+    sync();
+    document.dispatchEvent(new CustomEvent('themechange', { detail: next }));
+  });
+</script>
+
+<style>
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(140%) blur(10px);
+    -webkit-backdrop-filter: saturate(140%) blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .bar {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: 'logo nav tools';
+    align-items: center;
+    gap: 1rem;
+    min-height: 3.75rem;
+  }
+  .logo {
+    grid-area: logo;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-strong);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .logo:hover { color: var(--text-strong); }
+  .tilde { color: var(--accent); }
+  .cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1.05em;
+    margin-left: 2px;
+    vertical-align: -0.15em;
+    background: var(--accent);
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .nav { grid-area: nav; justify-self: end; }
+  .nav ul {
+    display: flex;
+    gap: 0.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .nav a {
+    display: block;
+    padding: 0.35rem 0.6rem;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--muted);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .nav a:hover { color: var(--text-strong); background: var(--surface-2); }
+  .nav a[aria-current='page'] { color: var(--accent); }
+  .nav a[aria-current='page']::before { content: '> '; }
+
+  .tools { grid-area: tools; display: flex; gap: 0.25rem; }
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--accent); border-color: var(--border); }
+  .moon { display: none; }
+  :global([data-theme='dark']) .sun { display: none; }
+  :global([data-theme='dark']) .moon { display: block; }
+
+  /* Narrow screens: nav drops to its own scrollable row under the logo. */
+  @media (max-width: 52rem) {
+    .bar {
+      grid-template-columns: 1fr auto;
+      grid-template-areas: 'logo tools' 'nav nav';
+      row-gap: 0;
+      padding-top: 0.4rem;
+    }
+    .nav {
+      justify-self: stretch;
+      overflow-x: auto;
+      scrollbar-width: none;
+      margin-inline: calc(var(--gutter) * -1);
+      padding-inline: calc(var(--gutter) - 0.6rem);
+      padding-bottom: 0.35rem;
+    }
+    .nav::-webkit-scrollbar { display: none; }
+  }
+</style>

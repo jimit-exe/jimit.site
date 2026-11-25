@@ -1,0 +1,52 @@
+---
+import { site } from '../lib/site';
+const year = new Date().getFullYear();
+---
+
+<footer class="site-footer">
+  <div class="container inner">
+    <p class="exit mono" aria-hidden="true">$ exit 0</p>
+    <p class="copy">© {year} {site.name} · {site.location}</p>
+    <ul class="links">
+      <li><a href={site.links.github} rel="noopener noreferrer" target="_blank">GitHub</a></li>
+      <li><a href={site.links.linkedin} rel="noopener noreferrer" target="_blank">LinkedIn</a></li>
+      <li><a href={`mailto:${site.email}`}>Email</a></li>
+      <li><a href={site.resume}>Résumé</a></li>
+      <li><a href="/tags">Tags</a></li>
+      <li><a href="/rss.xml">RSS</a></li>
+    </ul>
+  </div>
+</footer>
+
+<style>
+  .site-footer {
+    border-top: 1px solid var(--border);
+    margin-top: 4rem;
+    padding-block: 2rem;
+    font-size: 0.875rem;
+    color: var(--muted);
+  }
+  .inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1.5rem;
+  }
+  .exit { margin: 0; color: var(--accent); font-size: 0.8rem; }
+  .copy { margin: 0; }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1rem;
+    list-style: none;
+    margin: 0 0 0 auto;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+  }
+  .links a { color: var(--muted); text-decoration: none; }
+  .links a:hover { color: var(--accent); text-decoration: underline; }
+  @media (max-width: 40rem) {
+    .links { margin-left: 0; }
+  }
+</style>

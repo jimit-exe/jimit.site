@@ -1,0 +1,27 @@
+---
+import SectionList from '../../components/SectionList.astro';
+import { getPosts, getTags } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const tags = await getTags();
+  return tags.map(({ tag }) => ({ params: { tag } }));
+}
+
+const { tag } = Astro.params as { tag: string };
+const posts = await getPosts((p) => p.data.tags.includes(tag));
+const n = posts.length;
+---
+
+<SectionList
+  title={`#${tag}`}
+  command={`grep -l "${tag}" ~/posts/*`}
+  intro={`${n} ${n === 1 ? 'post' : 'posts'} tagged ${tag}, newest first.`}
+  posts={posts}
+  empty="Nothing here yet."
+>
+  <p slot="filters" class="mono back"><a href="/tags">← All tags</a></p>
+</SectionList>
+
+<style>
+  .back { font-size: 0.85rem; margin: -1rem 0 2rem; }
+</style>
