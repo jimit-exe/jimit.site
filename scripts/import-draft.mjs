@@ -202,7 +202,7 @@ for (let i = 0; i < lines.length; i++) {
   line = line.replace(/\\\[(REDACTED|VERIFY|SCREENSHOT|YOUR WORDS)([^\]\n]*?)\\\]/g, '[$1$2]');
 
   // Images: point at the post folder; if the file can't be found, leave a marker instead of a broken image.
-  line = line.replace(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(\s+"[^"]*")?\s*\)/g, (all, alt, ref, title = '') => {
+  line = line.replace(/!\[([^\]]*)\]\(\s*<?([^)\s>]+)>?(\s+"[^"]*")?\s*\)/g, (_all, alt, ref, title = '') => {
     const { ref: local, found, base } = localise(ref);
     if (found) return `![${alt}](${local}${title})`;
     missingImages++;

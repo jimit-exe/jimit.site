@@ -37,7 +37,6 @@ const posts = defineCollection({
         platform: z.string().min(1).optional(),
         difficulty: z.enum(DIFFICULTIES).optional(),
         repo: z
-          .string()
           .url()
           .refine((u) => u.startsWith('https://'), 'repo must be an https:// URL')
           .optional(),
