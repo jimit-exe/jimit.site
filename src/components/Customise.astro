@@ -1,0 +1,130 @@
+---
+// "Make it yours" panel: accent colour and a few toggles. Opens as a native popover, so it
+// closes on Esc or an outside click with no extra code.
+import { ACCENTS } from '../scripts/prefs';
+
+const toggles = [
+  { key: 'cat', label: 'Byte the cat', hint: 'naps in the footer' },
+  { key: 'crt', label: 'CRT screen', hint: 'scanlines, slight flicker' },
+  { key: 'mono', label: 'Hacker font', hint: 'monospace everything' },
+  { key: 'calm', label: 'Calm mode', hint: 'stop all animation' },
+];
+---
+
+<button class="icon-btn" type="button" popovertarget="prefs-panel" aria-label="Customise the site" title="Customise">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" aria-hidden="true">
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path>
+    <circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle>
+  </svg>
+</button>
+
+<div id="prefs-panel" class="prefs" popover aria-labelledby="prefs-title">
+  <p class="prefs-title mono" id="prefs-title">~/.config/jimit.site</p>
+
+  <fieldset>
+    <legend>Accent colour</legend>
+    <div class="swatches">
+      {
+        ACCENTS.map((a) => (
+          <label class={`swatch sw-${a}`} title={a}>
+            <input type="radio" name="accent" value={a} />
+            <span class="visually-hidden">{a}</span>
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Extras</legend>
+    {
+      toggles.map((t) => (
+        <label class="toggle">
+          <input type="checkbox" name={t.key} />
+          <span>
+            {t.label} <small class="muted">{t.hint}</small>
+          </span>
+        </label>
+      ))
+    }
+  </fieldset>
+
+  <button type="button" class="btn reset">Reset to defaults</button>
+</div>
+
+<script>
+  import { loadPrefs, savePrefs, DEFAULTS, type Prefs, type Accent } from '../scripts/prefs';
+
+  const panel = document.getElementById('prefs-panel');
+  const radios = panel?.querySelectorAll<HTMLInputElement>('input[name="accent"]') ?? [];
+  const boxes = panel?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [];
+
+  function render(p: Prefs) {
+    radios.forEach((r) => (r.checked = r.value === p.accent));
+    boxes.forEach((b) => (b.checked = Boolean(p[b.name as 'crt' | 'mono' | 'cat' | 'calm'])));
+  }
+
+  render(loadPrefs());
+  document.addEventListener('prefschange', (e) => render((e as CustomEvent<Prefs>).detail));
+
+  radios.forEach((r) => r.addEventListener('change', () => savePrefs({ ...loadPrefs(), accent: r.value as Accent })));
+  boxes.forEach((b) => b.addEventListener('change', () => savePrefs({ ...loadPrefs(), [b.name]: b.checked })));
+  panel?.querySelector('.reset')?.addEventListener('click', () => savePrefs({ ...DEFAULTS }));
+</script>
+
+<style>
+  .prefs {
+    position: fixed;
+    inset: 4.25rem var(--gutter) auto auto;
+    margin: 0;
+    width: min(19rem, calc(100vw - 2 * var(--gutter)));
+    padding: 1rem 1.1rem 1.1rem;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 12px 40px rgb(0 0 0 / 0.18);
+  }
+  .prefs-title { margin: 0 0 0.75rem; font-size: 0.8rem; color: var(--accent); }
+  .prefs-title::before { content: '$ vim '; color: var(--muted); }
+  fieldset { border: 0; margin: 0 0 0.9rem; padding: 0; }
+  legend {
+    padding: 0;
+    margin-bottom: 0.45rem;
+    font: 600 0.72rem var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+  .swatches { display: flex; gap: 0.55rem; }
+  .swatch {
+    position: relative;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 50%;
+    background: var(--sw);
+    cursor: pointer;
+    box-shadow: inset 0 0 0 2px rgb(0 0 0 / 0.12);
+  }
+  .swatch input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
+  .swatch:has(input:checked) { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text-strong); }
+  .swatch:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 4px; }
+  .sw-green { --sw: #22a355; }
+  .sw-amber { --sw: #f59e0b; }
+  .sw-cyan { --sw: #06b6d4; }
+  .sw-pink { --sw: #ec4899; }
+  .sw-violet { --sw: #8b5cf6; }
+  .toggle {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.3rem 0;
+    font-size: 0.9rem;
+    line-height: 1.35;
+    cursor: pointer;
+  }
+  .toggle input { accent-color: var(--accent); width: 1rem; height: 1rem; flex: none; transform: translateY(0.15rem); }
+  .toggle small { display: block; font-size: 0.75rem; }
+  .reset { width: 100%; justify-content: center; font-size: 0.8rem; padding: 0.45rem; }
+</style>

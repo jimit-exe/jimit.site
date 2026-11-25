@@ -1,0 +1,100 @@
+/* The fun layer: Byte the cat, accent colours, CRT mode, hacker font, calm mode, cat party. */
+
+/* ------------------------------------------------------------ accent colours */
+/* Light values first, then dark. Each pair keeps text contrast at 4.5:1 or better. */
+:root[data-accent='amber']  { --accent: #9a5800; --accent-strong: #723f00; --accent-soft: #fbeed8; --focus: #9a5800; }
+:root[data-accent='cyan']   { --accent: #0e7490; --accent-strong: #155e75; --accent-soft: #dcf3f8; --focus: #0e7490; }
+:root[data-accent='pink']   { --accent: #be185d; --accent-strong: #9d174d; --accent-soft: #fbe4ee; --focus: #be185d; }
+:root[data-accent='violet'] { --accent: #6d28d9; --accent-strong: #5b21b6; --accent-soft: #ece4fb; --focus: #6d28d9; }
+
+:root[data-theme='dark'][data-accent='amber']  { --accent: #fbbf24; --accent-strong: #fcd34d; --accent-soft: #2a1f08; --on-accent: #1a1204; --focus: #fcd34d; }
+:root[data-theme='dark'][data-accent='cyan']   { --accent: #22d3ee; --accent-strong: #67e8f9; --accent-soft: #0a2830; --on-accent: #04161a; --focus: #67e8f9; }
+:root[data-theme='dark'][data-accent='pink']   { --accent: #f472b6; --accent-strong: #f9a8d4; --accent-soft: #2d0f1f; --on-accent: #1f0612; --focus: #f9a8d4; }
+:root[data-theme='dark'][data-accent='violet'] { --accent: #a78bfa; --accent-strong: #c4b5fd; --accent-soft: #1d1533; --on-accent: #120a24; --focus: #c4b5fd; }
+
+/* ------------------------------------------------------------- hacker font */
+:root[data-mono] { --font-sans: var(--font-mono); }
+:root[data-mono] body { font-size: 1rem; }
+
+/* ----------------------------------------------------------------- CRT mode */
+:root[data-crt] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgb(0 0 0 / 0.07) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 60%, rgb(0 0 0 / 0.22) 100%);
+}
+:root[data-crt][data-theme='dark'] :is(h1, h2, h3, .prompt, .logo, .eyebrow) {
+  text-shadow: 0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+:root[data-crt] main { animation: crt-flicker 6s infinite steps(1); }
+@keyframes crt-flicker { 0%, 96%, 100% { opacity: 1; } 97% { opacity: 0.93; } 98% { opacity: 1; } 99% { opacity: 0.96; } }
+@media (forced-colors: active) { :root[data-crt] body::after { display: none; } }
+
+/* --------------------------------------------------------------- calm mode */
+:root[data-calm] *, :root[data-calm] *::before, :root[data-calm] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ----------------------------------------------------------------- the cat */
+.pixel-cat { display: block; overflow: visible; image-rendering: pixelated; }
+.px-o { fill: #2b1a10; }
+.px-b { fill: #f2a24e; }
+.px-s { fill: #c9732a; }
+.px-c { fill: #fde8cc; }
+.px-p { fill: #f29bb0; }
+.px-e { fill: var(--accent); }
+.px-h { fill: #ffffff; }
+.px-k { fill: var(--muted); }
+
+/* Default pose: asleep, tail swishing slowly. */
+.pixel-cat .l-eyesOpen, .pixel-cat .l-eyesSide { display: none; }
+.pixel-cat .l-tailDown { opacity: 0; }
+.pixel-cat .l-tailUp, .pixel-cat .l-tailDown { animation: tail 2.4s steps(1) infinite; }
+.pixel-cat .l-tailDown { animation-delay: -1.2s; }
+@keyframes tail { 0% { opacity: 1; } 50% { opacity: 0; } }
+
+/* Awake: eyes open with the odd blink. */
+.is-awake .pixel-cat .l-eyesShut { display: none; }
+.is-awake .pixel-cat .l-eyesOpen { display: inline; animation: blink-eyes 3.5s steps(1) infinite; }
+@keyframes blink-eyes { 0%, 92% { opacity: 1; } 93%, 96% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .pixel-cat .l-tailDown { display: none; }
+  .pixel-cat .l-tailUp { opacity: 1; animation: none; }
+}
+
+/* ------------------------------------------------------------- cat party */
+.cat-rain {
+  position: fixed;
+  top: -60px;
+  z-index: 150;
+  pointer-events: none;
+  animation: cat-fall var(--fall, 3s) linear forwards;
+}
+.cat-rain .pixel-cat { width: 60px; height: auto; }
+.cat-rain .l-eyesShut { display: none; }
+.cat-rain .l-eyesOpen { display: inline; }
+@keyframes cat-fall {
+  to { transform: translateY(calc(100vh + 80px)) rotate(var(--spin, 360deg)); }
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 1.5rem;
+  z-index: 160;
+  max-width: min(32rem, calc(100vw - 2rem));
+  padding: 0.75rem 1rem;
+  transform: translateX(-50%);
+  font: 0.85rem/1.5 var(--font-mono);
+  color: var(--text-strong);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.18);
+}

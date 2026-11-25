@@ -86,6 +86,18 @@ const ogImage = new URL(image, Astro.site ?? site.url).href;
           document.documentElement.dataset.theme = 'light';
         }
       })();
+      // Reader preferences from the customise panel (src/scripts/prefs.ts). Only known values are applied.
+      (function () {
+        try {
+          var p = JSON.parse(localStorage.getItem('prefs') || '{}') || {};
+          var d = document.documentElement.dataset;
+          if (['amber', 'cyan', 'pink', 'violet'].indexOf(p.accent) > -1) d.accent = p.accent;
+          if (p.crt === true) d.crt = '';
+          if (p.mono === true) d.mono = '';
+          if (p.calm === true) d.calm = '';
+          if (p.cat === false) d.nocat = '';
+        } catch (e) {}
+      })();
     </script>
     <slot name="head" />
   </head>
@@ -96,5 +108,8 @@ const ogImage = new URL(image, Astro.site ?? site.url).href;
       <slot />
     </main>
     <Footer />
+    <script>
+      import '../scripts/easter';
+    </script>
   </body>
 </html>

@@ -1,0 +1,30 @@
+---
+// Renders Byte as an inline SVG. Every layer is drawn; CSS decides which ones show and animates them.
+import { W, H, layerPaths, type LayerName } from '../lib/pixel';
+
+interface Props {
+  layers?: LayerName[];
+  class?: string;
+}
+const { layers = ['tailUp', 'tailDown', 'body', 'face', 'eyesOpen', 'eyesShut'], class: cls } = Astro.props;
+---
+
+<svg
+  class:list={['pixel-cat', cls]}
+  viewBox={`0 0 ${W} ${H}`}
+  width={W * 3}
+  height={H * 3}
+  shape-rendering="crispEdges"
+  aria-hidden="true"
+  focusable="false"
+>
+  {
+    layers.map((name) => (
+      <g class={`l-${name}`}>
+        {layerPaths(name).map((p) => (
+          <path class={p.cls} d={p.d} />
+        ))}
+      </g>
+    ))
+  }
+</svg>

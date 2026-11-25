@@ -1,0 +1,315 @@
+---
+// A small fake shell on the home page. Output is built with textContent and createElement only,
+// never innerHTML, so whatever a visitor types is printed as text.
+const quick = ['help', 'whoami', 'joke', 'hack', 'theme pink', 'cat flag.txt'];
+---
+
+<section class="term-wrap container" aria-labelledby="term-h">
+  <h2 id="term-h" class="visually-hidden">Interactive terminal</h2>
+  <div class="term">
+    <div class="term-bar" aria-hidden="true">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="term-title">guest@jimit.site: ~</span>
+    </div>
+    <div class="term-body" id="term-body">
+      <div class="term-out" id="term-out" role="log" aria-live="polite">
+        <p>Welcome, guest. This shell is real enough to be fun and fake enough to be safe.</p>
+        <p>Type <kbd>help</kbd> and press Enter, or tap a command below.</p>
+      </div>
+      <form class="term-line" id="term-form">
+        <span class="ps1" aria-hidden="true">guest@jimit.site:~$</span>
+        <input id="term-in" type="text" aria-label="Type a command" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="120" enterkeyhint="send" />
+      </form>
+    </div>
+  </div>
+  <ul class="quick" aria-label="Try a command">
+    {quick.map((q) => <li><button type="button" class="tag" data-cmd={q}>{q}</button></li>)}
+  </ul>
+</section>
+
+<script>
+  import { ACCENTS, updatePrefs, setTheme, type Accent } from '../scripts/prefs';
+  import { catParty } from '../scripts/easter';
+
+  const out = document.getElementById('term-out')!;
+  const body = document.getElementById('term-body')!;
+  const form = document.getElementById('term-form') as HTMLFormElement;
+  const input = document.getElementById('term-in') as HTMLInputElement;
+  const history: string[] = [];
+  let hIndex = 0;
+  let busy = false;
+
+  const SECTIONS: Record<string, string> = {
+    writeups: '/writeups',
+    blog: '/blog',
+    projects: '/projects',
+    about: '/about',
+    tags: '/tags',
+    search: '/search',
+    '~': '/',
+    '/': '/',
+  };
+
+  const JOKES = [
+    "I'd tell you a UDP joke, but you might not get it.",
+    "A SQL query walks into a bar, goes up to two tables and asks: 'Can I JOIN you?'",
+    'The S in IoT stands for security.',
+    'My password is the last eight digits of pi. Good luck.',
+    'There are two kinds of companies: those that have been breached, and those that will find out in the next pentest report.',
+    "Input validation is like flossing. Everyone says they do it.",
+    "It's not a vulnerability if it's in the threat model as 'accepted risk'.",
+    'I asked the firewall for a joke. It dropped it.',
+    'Knock knock. Who\'s there? SYN. SYN who? SYN-ACK. ...ACK.',
+    '2FA: because "Summer2024!" was never going to hold.',
+  ];
+
+  type Part = string | { text: string; href: string };
+
+  function print(...parts: Part[]) {
+    const p = document.createElement('p');
+    for (const part of parts) {
+      if (typeof part === 'string') p.append(part);
+      else {
+        const a = document.createElement('a');
+        a.href = part.href;
+        a.textContent = part.text;
+        p.append(a);
+      }
+    }
+    out.append(p);
+    body.scrollTop = body.scrollHeight;
+    return p;
+  }
+
+  function echoCommand(cmd: string) {
+    const p = print();
+    const ps1 = document.createElement('span');
+    ps1.className = 'ps1';
+    ps1.textContent = 'guest@jimit.site:~$ ';
+    p.append(ps1, cmd);
+  }
+
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function hack() {
+    busy = true;
+    const steps = [
+      'Bypassing the mainframe firewall...',
+      'Downloading more RAM...',
+      'Reversing the polarity of the neutron flow...',
+      'Guessing password: password123... hunter2... jimit...',
+    ];
+    for (const s of steps) {
+      print(s);
+      await sleep(550);
+    }
+    print('ACCESS GRANTED.');
+    await sleep(400);
+    print("Kidding. Real testing is slower and has more spreadsheets. Here's how I actually do it: ", {
+      text: 'methodology',
+      href: '/blog/ctf-methodology',
+    });
+    busy = false;
+  }
+
+  async function run(raw: string) {
+    const cmd = raw.trim();
+    echoCommand(cmd);
+    if (!cmd) return;
+    history.push(cmd);
+    hIndex = history.length;
+    const [name, ...args] = cmd.split(/\s+/);
+    const arg = args.join(' ');
+
+    if (/<\s*script|javascript:|onerror\s*=|<\s*img/i.test(cmd)) {
+      print('Nice try. This terminal prints with textContent, and the CSP blocks inline scripts anyway. No XSS for you, but I like your style.');
+      return;
+    }
+
+    switch (name.toLowerCase()) {
+      case 'help':
+        print('whoami        who is this guy');
+        print('ls            list files');
+        print('cd <dir>      go to writeups, blog, projects, about');
+        print('cat <file>    read a file');
+        print('theme <name>  light, dark, green, amber, cyan, pink, violet');
+        print('joke          security humour, peer-reviewed by nobody');
+        print('hack          hack the mainframe (legally)');
+        print('pet           pet Byte the cat');
+        print('clear         clear the screen');
+        print('(there may be a few undocumented ones)');
+        break;
+      case 'whoami':
+        print('jimit: postgrad cybersecurity student at UTS, ex full-stack dev, professional overthinker of input fields.');
+        break;
+      case 'ls':
+        print('writeups/  blog/  projects/  about.txt  resume.pdf  flag.txt  .secret');
+        break;
+      case 'ls -la':
+      case 'ls -a':
+        print('.  ..  .secret  writeups/  blog/  projects/  about.txt  resume.pdf  flag.txt');
+        break;
+      case 'cd': {
+        const dest = SECTIONS[arg.replace(/\/$/, '') || '~'];
+        if (dest) {
+          print(`cd ${arg || '~'} ...`);
+          location.href = dest;
+        } else print(`cd: ${arg}: No such file or directory`);
+        break;
+      }
+      case 'cat':
+        if (!arg) {
+          print('Byte is asleep in the footer. Try `pet`.');
+        } else if (arg === 'flag.txt') {
+          print('cat: flag.txt: Permission denied. Flags are earned, not cat-ed.');
+        } else if (arg === 'about.txt') {
+          print('Two years building auth systems, now breaking them for a living (well, for a degree). More: ', {
+            text: '/about',
+            href: '/about',
+          });
+        } else if (arg === 'resume.pdf') {
+          print('That is a binary file and your terminal would not enjoy it. ', { text: 'Open it in the browser', href: '/resume.pdf' });
+        } else if (arg === '.secret') {
+          print('The secret is that I re-read my own writeups for typos at 2am. Also: up up down down left right left right b a.');
+        } else print(`cat: ${arg}: No such file or directory`);
+        break;
+      case 'theme': {
+        const t = arg.toLowerCase();
+        if (t === 'light' || t === 'dark') setTheme(t);
+        else if ((ACCENTS as readonly string[]).includes(t)) updatePrefs({ accent: t as Accent });
+        else if (t === 'crt') updatePrefs({ crt: true });
+        else {
+          print('usage: theme light|dark|green|amber|cyan|pink|violet|crt');
+          break;
+        }
+        print(`theme set to ${t}. The sliders icon at the top has more options.`);
+        break;
+      }
+      case 'joke':
+        print(JOKES[Math.floor(Math.random() * JOKES.length)]);
+        break;
+      case 'hack':
+        await hack();
+        break;
+      case 'pet':
+      case 'meow':
+        document.querySelector<HTMLButtonElement>('#byte button')?.click();
+        print('Byte has been petted. Check the footer.');
+        break;
+      case 'party':
+        catParty('You found the party command.');
+        break;
+      case 'sudo':
+        print('guest is not in the sudoers file. This incident will be reported.');
+        break;
+      case 'rm':
+        print("rm: refusing to delete anything. It's a static site; all you'd hurt is my feelings.");
+        break;
+      case 'exit':
+        print('There is no escape. (The nav bar works though.)');
+        break;
+      case 'clear':
+        out.replaceChildren();
+        break;
+      case 'echo':
+        print(arg);
+        break;
+      case 'date':
+        print(new Date().toString());
+        break;
+      case 'vim':
+      case 'nano':
+      case 'emacs':
+        print("I'm not starting that war on my own website.");
+        break;
+      case 'nmap':
+        print('PORT    STATE  SERVICE\n443/tcp open   https (and a very strict CSP)');
+        break;
+      default:
+        print(`${name}: command not found. Try \`help\`.`);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    const value = input.value;
+    input.value = '';
+    await run(value);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' && hIndex > 0) {
+      hIndex--;
+      input.value = history[hIndex];
+      e.preventDefault();
+    } else if (e.key === 'ArrowDown') {
+      hIndex = Math.min(history.length, hIndex + 1);
+      input.value = history[hIndex] ?? '';
+      e.preventDefault();
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('.quick button').forEach((b) =>
+    b.addEventListener('click', () => {
+      if (!busy) run(b.dataset.cmd ?? '');
+    }),
+  );
+
+  body.addEventListener('click', (e) => {
+    if (!(e.target as HTMLElement).closest('a') && !getSelection()?.toString()) input.focus({ preventScroll: true });
+  });
+</script>
+
+<style>
+  .term-wrap { margin-top: 0.5rem; }
+  .term {
+    max-width: 46rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--code-bg);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .term-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .dot { width: 0.65rem; height: 0.65rem; border-radius: 50%; background: var(--border); }
+  .dot:nth-child(1) { background: #ff5f57; }
+  .dot:nth-child(2) { background: #febc2e; }
+  .dot:nth-child(3) { background: #28c840; }
+  .term-title { margin-left: 0.5rem; font: 0.75rem var(--font-mono); color: var(--muted); }
+  .term-body {
+    height: 15rem;
+    overflow-y: auto;
+    padding: 0.75rem 0.9rem;
+    font: 0.82rem/1.55 var(--font-mono);
+    color: var(--text);
+    cursor: text;
+  }
+  .term-out :global(p) { margin: 0 0 0.15rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .term-out :global(.ps1), .ps1 { color: var(--accent); }
+  .term-out kbd { color: var(--accent); }
+  .term-line { display: flex; align-items: baseline; gap: 0.5rem; }
+  .term-line .ps1 { flex: none; }
+  .term-line input {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--text-strong);
+    background: transparent;
+    border: 0;
+    caret-color: var(--accent);
+  }
+  .term-line input:focus { outline: none; }
+  .term:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.75rem 0 0; padding: 0; list-style: none; }
+  .quick .tag { cursor: pointer; }
+  .quick .tag::before { content: '$ '; }
+</style>

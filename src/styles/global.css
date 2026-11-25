@@ -2,6 +2,7 @@
 @import '@fontsource-variable/jetbrains-mono/wght.css';
 @import './prose.css';
 @import './blocks.css';
+@import './fun.css';
 
 /* ------------------------------------------------------------------ tokens */
 /* Light palette is the base; dark overrides it. The inline script in <head>
